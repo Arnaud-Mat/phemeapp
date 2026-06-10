@@ -36,14 +36,14 @@ from pathlib import Path
 # CONFIGURATION
 # ─────────────────────────────────────────────
 
-BREVO_SMTP_LOGIN  = "ae1387001@smtp-brevo.com"
-BREVO_API_KEY     = "xsmtpsib-c35d132ff59c0a7acd47584a3064fd78986954a2a1ec3cda491e4246b3f96516-MLMfUsjvSEhDzf9F"
-BREVO_SENDER      = "alerte@phemeapp.ch"
+BREVO_SMTP_LOGIN  = os.environ.get("BREVO_SMTP_LOGIN", "ae1387001@smtp-brevo.com")
+BREVO_API_KEY     = os.environ.get("BREVO_API_KEY", "xsmtpsib-c35d132ff59c0a7acd47584a3064fd78986954a2a1ec3cda491e4246b3f96516-MLMfUsjvSEhDzf9F")
+BREVO_SENDER      = os.environ.get("BREVO_SENDER", "alerte@phemeapp.ch")
 BREVO_SENDER_NAME = "PhémeApp"
 
 # Google Sheet public (lecture seule)
 # Format: https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}
-SHEET_ID          = "1YLK-KV_W7sNraeZdsyttykh1OnYU5aJOhl_NIqwFsJw"
+SHEET_ID          = os.environ.get("SHEET_ID", "1YLK-KV_W7sNraeZdsyttykh1OnYU5aJOhl_NIqwFsJw")
 SHEET_TAB         = "Form Responses 1"
 
 # Périmètre de détection en mètres

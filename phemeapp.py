@@ -61,7 +61,7 @@ PERIMETER_LARGE_M = 2000
 
 COMMUNE_BACKUP_URLS = {
     "AIGLE":    "https://www.aigle.ch/enquetes-publiques",
-    "MONTREUX": "https://www.montreux.ch/fr/urbanisme-construction/enquetes-publiques",
+    "MONTREUX": "https://www.montreux.ch/travaux-et-urbanisme/urbanisme/mises-a-lenquete",
 }
 
 # Fichiers locaux
@@ -69,7 +69,7 @@ NOTIFIED_FILE     = "notified.json"
 LOGS_DIR          = "logs"
 
 # URL fiche détaillée canton
-CAMAC_BASE_URL    = "https://prestations.vd.ch/pub/actiscamac/101091/5H1IET-7NLEK1/results"
+CAMAC_BASE_URL    = "https://prestations.vd.ch/pub/actiscamac/101091/5H1IET-7NLEK1/search"
 
 # ─────────────────────────────────────────────
 # INITIALISATION

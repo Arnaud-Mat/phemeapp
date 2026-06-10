@@ -55,9 +55,13 @@ SEARCH_DAYS       = 30
 
 # Double-check : sites communaux à scraper pour comparer les comptages
 # Format : { "NOM_COMMUNE_API": "URL_PAGE_ENQUETES" }
+SHEET_HISTORIQUE  = "Historique Alertes"
+SHEET_ZONE        = "Zone Elargie"
+PERIMETER_LARGE_M = 2000
+
 COMMUNE_BACKUP_URLS = {
     "AIGLE":    "https://www.aigle.ch/enquetes-publiques",
-    "MONTREUX": "https://www.montreux.ch/autorisations-de-construire-et-enquetes-publiques/enquetes-publiques",
+    "MONTREUX": "https://www.montreux.ch/enquetes-publiques",
 }
 
 # Fichiers locaux

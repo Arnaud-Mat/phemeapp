@@ -1,0 +1,40 @@
+name: PhemeApp - Detection quotidienne
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # 7h heure suisse (UTC+1)
+  workflow_dispatch:      # permet de lancer manuellement depuis GitHub
+
+jobs:
+  run-phemeapp:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Create logs directory
+        run: mkdir -p logs
+
+      - name: Run PhemeApp
+        env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+        run: python3 phemeapp.py
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phemeapp-logs
+          path: logs/
+          retention-days: 30
+

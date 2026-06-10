@@ -61,7 +61,7 @@ PERIMETER_LARGE_M = 2000
 
 COMMUNE_BACKUP_URLS = {
     "AIGLE":    "https://www.aigle.ch/enquetes-publiques",
-    "MONTREUX": "https://www.montreux.ch/enquetes-publiques",
+    "MONTREUX": "https://www.montreux.ch/fr/urbanisme-construction/enquetes-publiques",
 }
 
 # Fichiers locaux
@@ -409,6 +409,61 @@ def check_commune_backup(commune_name, api_count):
 # 7. BOUCLE PRINCIPALE
 # ─────────────────────────────────────────────
 
+def append_to_sheet(tab_name, row):
+    """
+    Ajoute une ligne dans un onglet du Google Sheet via l'API gviz.
+    Utilise l'API Sheets v4 en mode public append — nécessite que le Sheet
+    soit partagé en écriture OU on passe par Apps Script webhook.
+    Pour le MVP: on écrit dans un fichier CSV local qui sera importé manuellement
+    ou via un script Apps Script trigger.
+    On stocke dans un JSON local en attendant une solution d'écriture directe.
+    """
+    log_file = f"logs/sheet_{tab_name.replace(' ', '_').lower()}.jsonl"
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+def log_alerte_historique(user, adr, enquete, distance_m):
+    """Enregistre une alerte envoyée dans l'historique."""
+    date_fao = format_date(enquete.get("dateFao", 0))
+    row = {
+        "date_envoi":       datetime.now().isoformat(),
+        "email":            user["email"],
+        "nom":              user["nom"],
+        "label_adresse":    adr["label"],
+        "adresse":          adr["adresse"],
+        "no_camac":         enquete.get("noCamac"),
+        "lieu":             enquete.get("lieu"),
+        "commune":          enquete.get("commune"),
+        "nature_travaux":   enquete.get("natureTravaux"),
+        "distance_m":       round(distance_m),
+        "date_fao":         date_fao,
+        "lien":             f"{CAMAC_BASE_URL}?noCamac={enquete.get('noCamac')}"
+    }
+    append_to_sheet(SHEET_HISTORIQUE, row)
+    log(f"  Historique alerte enregistre: CAMAC {row['no_camac']} ({row['distance_m']}m)")
+
+def log_zone_elargie(user, adr, enquete, distance_m):
+    """Enregistre une publication dans la zone élargie (500m–2km)."""
+    date_fao = format_date(enquete.get("dateFao", 0))
+    row = {
+        "date_detection":   datetime.now().isoformat(),
+        "email":            user["email"],
+        "nom":              user["nom"],
+        "label_adresse":    adr["label"],
+        "adresse":          adr["adresse"],
+        "no_camac":         enquete.get("noCamac"),
+        "lieu":             enquete.get("lieu"),
+        "commune":          enquete.get("commune"),
+        "nature_travaux":   enquete.get("natureTravaux"),
+        "distance_m":       round(distance_m),
+        "date_fao":         date_fao,
+        "lien":             f"{CAMAC_BASE_URL}?noCamac={enquete.get('noCamac')}",
+        "inclus_newsletter": False
+    }
+    append_to_sheet(SHEET_ZONE, row)
+    log(f"  Zone élargie enregistrée: CAMAC {row['no_camac']} ({row['distance_m']}m)")
+
+
 def run():
     log("=" * 50)
     log("PhémeApp — démarrage")
@@ -487,57 +542,3 @@ PERIMETER_LARGE_M = 2000  # Zone élargie : 500m à 2km
 
 def get_sheet_csv_url(tab_name):
     return f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={requests.utils.quote(tab_name)}"
-
-def append_to_sheet(tab_name, row):
-    """
-    Ajoute une ligne dans un onglet du Google Sheet via l'API gviz.
-    Utilise l'API Sheets v4 en mode public append — nécessite que le Sheet
-    soit partagé en écriture OU on passe par Apps Script webhook.
-    Pour le MVP: on écrit dans un fichier CSV local qui sera importé manuellement
-    ou via un script Apps Script trigger.
-    On stocke dans un JSON local en attendant une solution d'écriture directe.
-    """
-    log_file = f"logs/sheet_{tab_name.replace(' ', '_').lower()}.jsonl"
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-def log_alerte_historique(user, adr, enquete, distance_m):
-    """Enregistre une alerte envoyée dans l'historique."""
-    date_fao = format_date(enquete.get("dateFao", 0))
-    row = {
-        "date_envoi":       datetime.now().isoformat(),
-        "email":            user["email"],
-        "nom":              user["nom"],
-        "label_adresse":    adr["label"],
-        "adresse":          adr["adresse"],
-        "no_camac":         enquete.get("noCamac"),
-        "lieu":             enquete.get("lieu"),
-        "commune":          enquete.get("commune"),
-        "nature_travaux":   enquete.get("natureTravaux"),
-        "distance_m":       round(distance_m),
-        "date_fao":         date_fao,
-        "lien":             f"{CAMAC_BASE_URL}?noCamac={enquete.get('noCamac')}"
-    }
-    append_to_sheet(SHEET_HISTORIQUE, row)
-    log(f"  Historique alerte enregistre: CAMAC {row['no_camac']} ({row['distance_m']}m)")
-
-def log_zone_elargie(user, adr, enquete, distance_m):
-    """Enregistre une publication dans la zone élargie (500m–2km)."""
-    date_fao = format_date(enquete.get("dateFao", 0))
-    row = {
-        "date_detection":   datetime.now().isoformat(),
-        "email":            user["email"],
-        "nom":              user["nom"],
-        "label_adresse":    adr["label"],
-        "adresse":          adr["adresse"],
-        "no_camac":         enquete.get("noCamac"),
-        "lieu":             enquete.get("lieu"),
-        "commune":          enquete.get("commune"),
-        "nature_travaux":   enquete.get("natureTravaux"),
-        "distance_m":       round(distance_m),
-        "date_fao":         date_fao,
-        "lien":             f"{CAMAC_BASE_URL}?noCamac={enquete.get('noCamac')}",
-        "inclus_newsletter": False
-    }
-    append_to_sheet(SHEET_ZONE, row)
-    log(f"  Zone élargie enregistrée: CAMAC {row['no_camac']} ({row['distance_m']}m)")

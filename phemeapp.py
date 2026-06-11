@@ -386,6 +386,130 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
 # DOUBLE-CHECK : SITES COMMUNAUX
 # ─────────────────────────────────────────────
 
+
+COMMUNES_CACHE_FILE = "communes_cache.json"
+
+def load_communes_cache():
+    """Charge le cache des URLs communales."""
+    if Path(COMMUNES_CACHE_FILE).exists():
+        with open(COMMUNES_CACHE_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_communes_cache(cache):
+    with open(COMMUNES_CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(cache, f, indent=2, ensure_ascii=False)
+
+def get_commune_from_coords(lat, lng):
+    """Trouve le nom de la commune depuis des coordonnees GPS via Nominatim."""
+    try:
+        r = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={"lat": lat, "lon": lng, "format": "json", "accept-language": "fr"},
+            headers={"User-Agent": "PhemeApp/1.0 phemeapp.ch"},
+            timeout=10
+        )
+        addr = r.json().get("address", {})
+        commune = addr.get("town") or addr.get("village") or addr.get("city") or addr.get("municipality") or ""
+        return commune.upper().strip()
+    except Exception as e:
+        log(f"  Reverse geocoding impossible: {e}")
+        return ""
+
+def find_commune_enquetes_url(commune_name):
+    """
+    Cherche automatiquement la page des mises a l enquete du site communal.
+    Utilise une recherche DuckDuckGo puis verifie les resultats.
+    Retourne l URL si trouvee, sinon None.
+    """
+    # D abord verifier dans COMMUNE_BACKUP_URLS
+    if commune_name.upper() in COMMUNE_BACKUP_URLS:
+        return COMMUNE_BACKUP_URLS[commune_name.upper()]
+
+    # Puis verifier dans le cache
+    cache = load_communes_cache()
+    if commune_name.upper() in cache:
+        return cache[commune_name.upper()]
+
+    log(f"  Recherche URL enquetes pour commune: {commune_name}")
+
+    # Recherche via l API DuckDuckGo (gratuite, sans cle)
+    search_queries = [
+        f"{commune_name.lower()} vaud mises enquete publique permis construire",
+        f"site:{commune_name.lower()}.ch enquete publique",
+    ]
+
+    found_url = None
+
+    for query in search_queries:
+        try:
+            r = requests.get(
+                "https://api.duckduckgo.com/",
+                params={"q": query, "format": "json", "no_redirect": "1", "no_html": "1"},
+                headers={"User-Agent": "PhemeApp/1.0 phemeapp.ch"},
+                timeout=10
+            )
+            results = r.json()
+
+            # Verifier les resultats
+            related = results.get("RelatedTopics", [])
+            abstract_url = results.get("AbstractURL", "")
+
+            candidates = [abstract_url] if abstract_url else []
+            for item in related[:5]:
+                if isinstance(item, dict) and item.get("FirstURL"):
+                    candidates.append(item["FirstURL"])
+
+            # Filtrer pour garder les URLs pertinentes
+            commune_lower = commune_name.lower()
+            keywords = ["enquete", "permis", "construire", "urbanisme", "construction"]
+            for url in candidates:
+                url_lower = url.lower()
+                if commune_lower in url_lower and any(kw in url_lower for kw in keywords):
+                    found_url = url
+                    log(f"  URL trouvee pour {commune_name}: {found_url}")
+                    break
+
+            if found_url:
+                break
+
+        except Exception as e:
+            log(f"  Recherche URL {commune_name} echouee: {e}")
+            continue
+
+    # Fallback: construire une URL probable et la tester
+    if not found_url:
+        commune_slug = commune_name.lower().replace(" ", "-").replace("e", "e")
+        candidates_urls = [
+            f"https://www.{commune_slug}.ch/construction-urbanisme/mises-a-l-enquete",
+            f"https://www.{commune_slug}.ch/urbanisme/enquetes-publiques",
+            f"https://www.{commune_slug}.ch/travaux-urbanisme/mises-a-lenquete",
+            f"https://www.{commune_slug}.ch/enquetes-publiques",
+        ]
+        for url in candidates_urls:
+            try:
+                resp = requests.get(url, timeout=8, headers={"User-Agent": "PhemeApp/1.0"}, allow_redirects=True)
+                if resp.status_code == 200 and any(kw in resp.text.lower() for kw in ["enquete", "permis de construire"]):
+                    found_url = url
+                    log(f"  URL fallback validee pour {commune_name}: {found_url}")
+                    break
+            except:
+                continue
+
+    # Sauvegarder dans le cache
+    if found_url:
+        cache[commune_name.upper()] = found_url
+        save_communes_cache(cache)
+        log(f"  URL communale mise en cache: {commune_name} -> {found_url}")
+    else:
+        # Mettre None en cache pour eviter de re-chercher
+        cache[commune_name.upper()] = None
+        save_communes_cache(cache)
+        log(f"  Aucune URL trouvee pour {commune_name} - FAO utilisee par defaut")
+
+    return found_url
+
+
 def check_commune_backup(commune_name, api_count):
     """
     Scrappe la page d'enquêtes du site communal et compare le comptage

@@ -60,8 +60,13 @@ SHEET_ZONE        = "Zone Elargie"
 PERIMETER_LARGE_M = 2000
 
 COMMUNE_BACKUP_URLS = {
-    "AIGLE":    "https://www.aigle.ch/enquetes-publiques",
-    "MONTREUX": "https://www.montreux.ch/travaux-et-urbanisme/urbanisme/mises-a-lenquete",
+    "AIGLE":       "https://www.aigle.ch/enquetes-publiques",
+    "MONTREUX":    "https://www.montreux.ch/travaux-et-urbanisme/urbanisme/mises-a-lenquete",
+    "PREVERENGES": "https://www.preverenges.ch/informations",
+    "LAUSANNE":    "https://www.lausanne.ch/officiel/administration/travaux/urbanisme/permis-et-enquetes/mises-a-l-enquete.html",
+    "MORGES":      "https://www.morges.ch/urbanisme-constructions/enquetes-publiques",
+    "NYON":        "https://www.nyon.ch/fr/vie-quotidienne/construction-urbanisme/mises-a-lenquete",
+    "RENENS":      "https://www.renens.ch/urbanisme/mises-a-l-enquete",
 }
 
 # Fichiers locaux
@@ -70,6 +75,7 @@ LOGS_DIR          = "logs"
 
 # URL fiche détaillée canton
 CAMAC_BASE_URL    = "https://prestations.vd.ch/pub/actiscamac/101091/5H1IET-7NLEK1/search"
+FAO_BASE_URL      = "https://www.faovd.ch/permis-de-construire/"
 
 # ─────────────────────────────────────────────
 # INITIALISATION

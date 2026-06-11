@@ -512,27 +512,31 @@ def find_commune_enquetes_url(commune_name):
 
 def check_commune_backup(commune_name, api_count):
     """
-    Scrappe la page d'enquêtes du site communal et compare le comptage
-    avec celui de l'API cantonale. Log une alerte si écart détecté.
+    Double-check sur le site officiel de la commune.
+    Cherche automatiquement l URL de la page des enquetes publiques
+    si elle n est pas encore connue, puis scrape le contenu.
+    Source privilegiee : commune (dossiers complets avec plans).
     """
-    url = COMMUNE_BACKUP_URLS.get(commune_name.upper())
+    # Trouver l URL communale automatiquement
+    url = find_commune_enquetes_url(commune_name)
+
     if not url:
-        return  # pas de backup configuré pour cette commune
+        log(f"  Aucun site communal trouve pour {commune_name} - double-check ignore")
+        return
 
     try:
         r = requests.get(url, timeout=10, headers={"User-Agent": "PhemeApp/1.0"})
         r.raise_for_status()
-        # Compter les occurrences de mots-clés typiques d'une mise à l'enquête
         text = r.text.lower()
-        keywords = ["enquête", "enquete", "camac", "mise à l'enquête", "permis de construire"]
+        keywords = ["enquete", "enquête", "permis de construire", "mise à l enquete", "camac"]
         hits = sum(text.count(kw) for kw in keywords)
 
         if hits == 0 and api_count > 0:
-            log(f"  ⚠️  DOUBLE-CHECK {commune_name} : site communal semble vide mais API retourne {api_count} résultats — vérification manuelle conseillée")
+            log(f"  ATTENTION {commune_name} : site communal ({url}) semble vide mais CAMAC retourne {api_count} resultats")
         else:
-            log(f"  ✅ Double-check {commune_name} : site communal accessible ({hits} occurrences de mots-clés)")
+            log(f"  OK double-check {commune_name} : {hits} occurrences sur {url}")
     except Exception as e:
-        log(f"  ⚠️  Double-check {commune_name} inaccessible : {e}")
+        log(f"  Double-check {commune_name} inaccessible ({url}) : {e}")
 
 
 # ─────────────────────────────────────────────

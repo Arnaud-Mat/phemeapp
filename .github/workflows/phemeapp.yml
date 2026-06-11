@@ -5,6 +5,9 @@ on:
     - cron: "0 6 * * *"  # 7h heure suisse (UTC+1)
   workflow_dispatch:      # permet de lancer manuellement depuis GitHub
 
+permissions:
+  contents: write         # necessaire pour ecrire notified.json dans le repo
+
 jobs:
   run-phemeapp:
     runs-on: ubuntu-latest
@@ -28,6 +31,10 @@ jobs:
         env:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SENDER: ${{ secrets.BREVO_SENDER }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: python3 phemeapp.py
 
       - name: Upload logs
@@ -37,4 +44,3 @@ jobs:
           name: phemeapp-logs
           path: logs/
           retention-days: 30
-

@@ -543,18 +543,41 @@ def check_commune_backup(commune_name, api_count):
 # 7. BOUCLE PRINCIPALE
 # ─────────────────────────────────────────────
 
+# URL du Apps Script Web App pour ecriture dans le Sheet
+# A deployer une fois via Apps Script > Deployer > Nouvelle mise en prod > Web App
+# Acces: Tout le monde, executer en tant que: moi
+APPS_SCRIPT_WEBAPP_URL = os.environ.get("APPS_SCRIPT_WEBAPP_URL", "")
+
 def append_to_sheet(tab_name, row):
     """
-    Ajoute une ligne dans un onglet du Google Sheet via l'API gviz.
-    Utilise l'API Sheets v4 en mode public append — nécessite que le Sheet
-    soit partagé en écriture OU on passe par Apps Script webhook.
-    Pour le MVP: on écrit dans un fichier CSV local qui sera importé manuellement
-    ou via un script Apps Script trigger.
-    On stocke dans un JSON local en attendant une solution d'écriture directe.
+    Ecrit une ligne dans le Google Sheet via deux methodes:
+    1. Apps Script Web App (si URL configuree) -> ecriture directe dans le Sheet
+    2. Fichier JSONL local (backup toujours actif)
     """
+    # Backup local JSONL (toujours)
+    Path("logs").mkdir(exist_ok=True)
     log_file = f"logs/sheet_{tab_name.replace(' ', '_').lower()}.jsonl"
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    # Ecriture dans le Sheet via Apps Script Web App
+    if APPS_SCRIPT_WEBAPP_URL:
+        try:
+            payload = {"tab": tab_name, "row": row}
+            resp = requests.post(
+                APPS_SCRIPT_WEBAPP_URL,
+                json=payload,
+                timeout=15,
+                headers={"Content-Type": "application/json"}
+            )
+            if resp.status_code == 200:
+                log(f"  Sheet '{tab_name}' mis a jour")
+            else:
+                log(f"  Sheet '{tab_name}' erreur {resp.status_code}: {resp.text[:100]}")
+        except Exception as e:
+            log(f"  Sheet '{tab_name}' inaccessible: {e} (JSONL sauvegarde localement)")
+    else:
+        log(f"  JSONL local: {log_file} (configurer APPS_SCRIPT_WEBAPP_URL pour ecrire dans le Sheet)")
 
 def log_alerte_historique(user, adr, enquete, distance_m):
     """Enregistre une alerte envoyée dans l'historique."""

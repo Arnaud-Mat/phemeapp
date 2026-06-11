@@ -238,15 +238,86 @@ def haversine_m(lat1, lng1, lat2, lng2):
 # 5. MÉMOIRE DES NOTIFICATIONS
 # ─────────────────────────────────────────────
 
+# Token GitHub pour lecture/ecriture notified.json dans le repo
+GITHUB_TOKEN   = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_REPO    = os.environ.get("GITHUB_REPOSITORY", "Arnaud-Mat/phemeapp")
+NOTIFIED_PATH  = "notified.json"
+
 def load_notified():
+    """
+    Charge notified.json depuis GitHub (si GITHUB_TOKEN disponible)
+    ou depuis le fichier local en fallback.
+    """
+    # Essai lecture depuis GitHub
+    if GITHUB_TOKEN:
+        try:
+            r = requests.get(
+                f"https://api.github.com/repos/{GITHUB_REPO}/contents/{NOTIFIED_PATH}",
+                headers={"Authorization": f"token {GITHUB_TOKEN}",
+                         "Accept": "application/vnd.github.v3+json"},
+                timeout=10
+            )
+            if r.status_code == 200:
+                data = r.json()
+                content = base64.b64decode(data["content"]).decode("utf-8")
+                log("notified.json charge depuis GitHub")
+                return json.loads(content)
+            elif r.status_code == 404:
+                log("notified.json absent sur GitHub - nouveau fichier")
+                return {}
+        except Exception as e:
+            log(f"Erreur lecture notified.json GitHub: {e}")
+
+    # Fallback: fichier local
     if Path(NOTIFIED_FILE).exists():
         with open(NOTIFIED_FILE, encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 def save_notified(notified):
+    """
+    Sauvegarde notified.json sur GitHub (si GITHUB_TOKEN disponible)
+    ET localement en backup.
+    """
+    content_str = json.dumps(notified, indent=2, ensure_ascii=False)
+
+    # Sauvegarde locale
     with open(NOTIFIED_FILE, "w", encoding="utf-8") as f:
-        json.dump(notified, f, indent=2, ensure_ascii=False)
+        f.write(content_str)
+
+    # Sauvegarde sur GitHub
+    if GITHUB_TOKEN:
+        try:
+            encoded = base64.b64encode(content_str.encode("utf-8")).decode()
+
+            # Recuperer le SHA actuel si le fichier existe
+            r = requests.get(
+                f"https://api.github.com/repos/{GITHUB_REPO}/contents/{NOTIFIED_PATH}",
+                headers={"Authorization": f"token {GITHUB_TOKEN}",
+                         "Accept": "application/vnd.github.v3+json"},
+                timeout=10
+            )
+            payload = {
+                "message": "Update notified.json",
+                "content": encoded,
+                "committer": {"name": "PhemeApp Bot", "email": "bot@phemeapp.ch"}
+            }
+            if r.status_code == 200:
+                payload["sha"] = r.json()["sha"]
+
+            resp = requests.put(
+                f"https://api.github.com/repos/{GITHUB_REPO}/contents/{NOTIFIED_PATH}",
+                headers={"Authorization": f"token {GITHUB_TOKEN}",
+                         "Accept": "application/vnd.github.v3+json"},
+                json=payload,
+                timeout=15
+            )
+            if resp.status_code in [200, 201]:
+                log(f"notified.json sauvegarde sur GitHub ({len(notified)} entrees)")
+            else:
+                log(f"Erreur sauvegarde GitHub: {resp.status_code}")
+        except Exception as e:
+            log(f"Erreur ecriture notified.json GitHub: {e}")
 
 def already_notified(notified, email, no_camac):
     return f"{email}:{no_camac}" in notified

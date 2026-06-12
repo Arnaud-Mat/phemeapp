@@ -443,6 +443,7 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
     prefix_alerte = "\u26a0\ufe0f URGENT \u2014 " if urgence else "\u23f1 "
     jours_txt     = f"{jours_restants} jour{'s' if jours_restants > 1 else ''}"
     no_camac    = enquete.get("noCamac", "?")
+    unsub_lien  = get_unsub_link(dest_email)
     lieu        = enquete.get("lieu", "—")
     commune     = enquete.get("commune", "—")
     description = enquete.get("description", "—")
@@ -850,6 +851,7 @@ def send_monthly_confirmation(user, notified):
         return
 
     prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+    unsub_lien = get_unsub_link(email)
 
     # Lire l historique réel depuis le Sheet
     alertes_mois = load_historique_from_sheet(email, mois)

@@ -404,7 +404,7 @@ def send_welcome_email(dest_email, dest_nom, adresses):
   </div>
   <p style="font-size:14px;color:#444;line-height:1.7;">Pour modifier vos adresses ou vous désinscrire, répondez simplement à cet email.</p>
   <p style="font-size:14px;color:#444;">Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>
-  <p style="font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;margin-top:24px;line-height:1.6;">PhémeApp est un service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>
+  <p style="font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;margin-top:24px;line-height:1.6;">PhémeApp est un service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>
 </div></body></html>"""
     try:
         msg = MIMEMultipart("alternative")
@@ -484,7 +484,7 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
         </div>
 
         <p style="font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;">
-          PhémeApp est un service d'information automatisé. Il ne remplace pas un avis juridique. &nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a>
+          PhémeApp est un service d'information automatisé. Il ne remplace pas un avis juridique. &nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a>
         </p>
       </div>
     </body></html>"""
@@ -944,7 +944,7 @@ def send_monthly_confirmation(user, notified):
         "<strong>L'équipe PhémeApp</strong></p>"
         "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>"
         "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. "
-        f"&nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+        f"&nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
         "</div></body></html>"
     )
 
@@ -1018,7 +1018,7 @@ def send_rappel_j7(user, notified, enquetes):
                 f"<div style='text-align:center;margin:24px 0'><a href='{lien}' style='background:#dc2626;color:white;padding:14px 28px;text-decoration:none;border-radius:6px;font-size:15px;font-weight:bold'>Consulter le dossier →</a></div>"
                 "<p style='font-size:13px;color:#666'>En cas de doute, n'hésitez pas à contacter votre commune ou un avocat spécialisé en droit public.</p>"
                 "<p style='font-size:14px;color:#444'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
-                f"<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+                f"<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
                 "</div></body></html>"
             )
 
@@ -1093,7 +1093,7 @@ def send_weekly_summary(user, notified, enquetes):
         "<p style='font-size:14px;color:#444;margin-top:20px'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
         "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>"
         "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. "
-        "&nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+        "&nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
         "</div></body></html>"
     )
 
@@ -1103,6 +1103,48 @@ def send_weekly_summary(user, notified, enquetes):
         log(f"  Résumé hebdo envoyé -> {email}")
     except Exception as e:
         log(f"  Erreur résumé hebdo {email}: {e}", "error")
+
+
+def generate_unsub_token(email):
+    """Génère un token unique de désinscription pour l'email donné."""
+    import hashlib
+    secret = "phemeapp-unsub-2026"
+    return hashlib.sha256(f"{email}{secret}".encode()).hexdigest()[:16]
+
+def get_unsub_link(email):
+    """
+    IDEA-P06: Retourne le lien de désinscription personnalisé.
+    MVP: mailto avec token pour vérification manuelle.
+    Future: URL vers Apps Script Web App qui supprime automatiquement du Sheet.
+    """
+    token = generate_unsub_token(email)
+    apps_url = APPS_SCRIPT_WEBAPP_URL
+    if apps_url:
+        # Désinscription automatique via Apps Script Web App
+        return f"{apps_url}?action=unsubscribe&email={requests.utils.quote(email)}&token={token}"
+    else:
+        # Fallback: mailto
+        import urllib.parse
+        subject = urllib.parse.quote(f"Désinscription PhémeApp [{token}]")
+        return f"mailto:alerte@phemeapp.ch?subject={subject}"
+
+def handle_unsubscribe_in_sheet(email):
+    """
+    IDEA-P06: Marque l'utilisateur comme désinscrit dans le Sheet.
+    Appelé par Apps Script Web App quand l'utilisateur clique sur le lien.
+    """
+    try:
+        if not APPS_SCRIPT_WEBAPP_URL:
+            return False
+        resp = requests.post(
+            APPS_SCRIPT_WEBAPP_URL,
+            json={"action": "unsubscribe", "email": email},
+            timeout=10
+        )
+        return resp.status_code == 200
+    except Exception as e:
+        log(f"  Erreur désinscription {email}: {e}", "error")
+        return False
 
 
 def ping_healthcheck(fail=False):

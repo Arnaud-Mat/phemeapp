@@ -391,6 +391,12 @@ def format_date(ts_ms):
 
 def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
     date_fao    = format_date(enquete.get("dateFao", 0))
+    try:
+        jours_restants = max(0, (datetime.fromtimestamp(enquete.get("dateFao",0)/1000) + timedelta(days=30) - datetime.now()).days)
+        urgence = jours_restants <= 7
+    except:
+        jours_restants = 30
+        urgence = False
     no_camac    = enquete.get("noCamac", "?")
     lieu        = enquete.get("lieu", "—")
     commune     = enquete.get("commune", "—")
@@ -414,8 +420,8 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
         <em>« {adresse['label']} — {adresse['adresse']} »</em>.</p>
 
         <div style="background:#fff8e1;border-left:4px solid #f59e0b;padding:14px 18px;margin:20px 0;border-radius:4px;">
-          <strong style="color:#92400e;">⏱ 30 jours pour faire opposition</strong><br>
-          <span style="font-size:13px;color:#92400e;">Date FAO : <strong>{date_fao}</strong> — le délai court dès cette date.</span>
+          <strong style="color:{'#991b1b' if urgence else '#92400e'}">{'⚠️ URGENT — ' if urgence else '⏱ '}{jours_restants} jour{'s' if jours_restants > 1 else ''} pour faire opposition</strong><br>
+          <span style="font-size:13px;color:{'#991b1b' if urgence else '#92400e'}">Date FAO : <strong>{date_fao}</strong> — d&eacute;lai l&eacute;gal de 30 jours.</span>
         </div>
 
         <table style="width:100%;border-collapse:collapse;margin:20px 0;">
@@ -653,6 +659,10 @@ def append_to_sheet(tab_name, row):
 def log_alerte_historique(user, adr, enquete, distance_m):
     """Enregistre une alerte envoyée dans l'historique."""
     date_fao = format_date(enquete.get("dateFao", 0))
+    try:
+        jours_restants = max(0, (datetime.fromtimestamp(enquete.get("dateFao",0)/1000) + timedelta(days=30) - datetime.now()).days)
+    except:
+        jours_restants = 30
     row = {
         "date_envoi":       datetime.now().isoformat(),
         "email":            user["email"],
@@ -673,6 +683,10 @@ def log_alerte_historique(user, adr, enquete, distance_m):
 def log_zone_elargie(user, adr, enquete, distance_m):
     """Enregistre une publication dans la zone élargie (500m–2km)."""
     date_fao = format_date(enquete.get("dateFao", 0))
+    try:
+        jours_restants = max(0, (datetime.fromtimestamp(enquete.get("dateFao",0)/1000) + timedelta(days=30) - datetime.now()).days)
+    except:
+        jours_restants = 30
     row = {
         "date_detection":   datetime.now().isoformat(),
         "email":            user["email"],
@@ -690,6 +704,132 @@ def log_zone_elargie(user, adr, enquete, distance_m):
     }
     append_to_sheet(SHEET_ZONE, row)
     log(f"  Zone élargie enregistrée: CAMAC {row['no_camac']} ({row['distance_m']}m)")
+
+
+def send_monthly_confirmation(user, notified, enquetes):
+    """
+    IDEA-P03: Email mensuel confirmant que la surveillance est active.
+    Montre les publications les plus proches ce mois. Max 1x/mois/utilisateur.
+    """
+    email = user["email"]
+    mois  = datetime.now().strftime("%Y-%m")
+    key   = f"monthly:{email}:{mois}"
+    if key in notified:
+        return
+
+    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+    total  = len(enquetes)
+
+    # 5 publications les plus proches toutes adresses confondues
+    proches = []
+    for adr in user["adresses"]:
+        if not adr.get("lat"):
+            continue
+        for e in enquetes:
+            if e.get("lat") and e.get("lng"):
+                d = haversine_m(adr["lat"], adr["lng"], e["lat"], e["lng"])
+                if d <= 2000:
+                    proches.append((d, e, adr["label"]))
+    proches.sort(key=lambda x: x[0])
+    proches = proches[:5]
+
+    alerte_500 = sum(1 for d, _, _ in proches if d <= 500)
+    couleur_header = "#dc2626" if alerte_500 else "#1a7a4a"
+    msg_statut = (
+        f"⚠️ {alerte_500} publication(s) dans votre périmètre ce mois"
+        if alerte_500 else
+        "✅ Aucune mise à l'enquête dans votre périmètre ce mois"
+    )
+
+    rows_html = ""
+    for dist, e, label in proches:
+        commune  = e.get("commune", "--")
+        nature   = (e.get("natureTravaux") or "--")[:50]
+        date_fao = format_date(e.get("dateFao", 0))
+        col      = "#dc2626" if dist <= 500 else "#f59e0b" if dist <= 1000 else "#888"
+        rows_html += (
+            f"<tr style='border-bottom:1px solid #eee'>"
+            f"<td style='padding:7px 8px;color:{col};font-weight:bold'>{round(dist)}m</td>"
+            f"<td style='padding:7px 8px'>{commune}</td>"
+            f"<td style='padding:7px 8px;font-size:12px;color:#666'>{nature}</td>"
+            f"<td style='padding:7px 8px;font-size:12px'>{date_fao}</td>"
+            f"<td style='padding:7px 8px;font-size:11px;color:#888'>{label}</td>"
+            f"</tr>"
+        )
+
+    html = (
+        "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"
+        "<div style='background:#1a3a5c;padding:18px 24px'>"
+        "<h1 style='color:white;margin:0;font-size:20px'>PhémeApp</h1>"
+        f"<p style='color:#a8c4e0;margin:4px 0 0;font-size:12px'>Rapport mensuel — {datetime.now().strftime('%B %Y')}</p>"
+        "</div><div style='padding:24px'>"
+        f"<p style='font-size:16px'>Bonjour {prenom},</p>"
+        f"<p style='font-size:14px;color:#444;line-height:1.7'>Votre surveillance PhémeApp est <strong style='color:#1a7a4a'>active</strong>. "
+        f"Ce mois, notre système a analysé <strong>{total} mises à l'enquête</strong> dans le canton de Vaud.</p>"
+        f"<div style='background:#f0fdf4;border-left:3px solid {couleur_header};padding:14px 18px;margin:16px 0;border-radius:0 6px 6px 0'>"
+        f"<strong style='color:{couleur_header}'>{msg_statut}</strong></div>"
+    )
+
+    if proches:
+        html += (
+            "<p style='font-size:14px;color:#444;margin-top:16px'>Publications les plus proches ce mois :</p>"
+            "<table style='width:100%;border-collapse:collapse;font-size:13px'>"
+            "<tr style='background:#f0f4f8'>"
+            "<th style='padding:7px 8px;text-align:left'>Distance</th>"
+            "<th style='padding:7px 8px;text-align:left'>Commune</th>"
+            "<th style='padding:7px 8px;text-align:left'>Nature</th>"
+            "<th style='padding:7px 8px;text-align:left'>FAO</th>"
+            "<th style='padding:7px 8px;text-align:left'>Adresse</th></tr>"
+            + rows_html + "</table>"
+        )
+    else:
+        html += "<p style='font-size:14px;color:#666'>Aucune publication détectée dans un rayon de 2km.</p>"
+
+    html += (
+        "<p style='font-size:14px;color:#444;margin-top:20px'>Bien cordialement,<br>"
+        "<strong>L'équipe PhémeApp</strong></p>"
+        "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>"
+        "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique.</p>"
+        "</div></body></html>"
+    )
+
+    try:
+        smtp_send(email, f"PhémeApp — Rapport {datetime.now().strftime('%B %Y')}", html)
+        notified[key] = datetime.now().isoformat()
+        log(f"  Rapport mensuel envoyé -> {email}")
+    except Exception as e:
+        log(f"  Erreur rapport mensuel {email}: {e}")
+
+
+HEALTHCHECK_URL = os.environ.get("HEALTHCHECK_URL", "")
+ADMIN_EMAIL     = os.environ.get("ADMIN_EMAIL", "arnaud.mathier@gmail.com")
+
+def ping_healthcheck(fail=False):
+    """IDEA-T05: Ping healthcheck.io pour monitorer le cron."""
+    if not HEALTHCHECK_URL:
+        return
+    try:
+        url = HEALTHCHECK_URL + ("/fail" if fail else "")
+        requests.get(url, timeout=5)
+        log("Healthcheck ping: OK" + (" (FAIL)" if fail else ""))
+    except:
+        pass
+
+def send_admin_alert(subject, body):
+    """IDEA-T05: Email d alerte a l admin si le script plante."""
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"[PhemeApp ERREUR] {subject}"
+        msg["From"]    = f"{BREVO_SENDER_NAME} <{BREVO_SENDER}>"
+        msg["To"]      = ADMIN_EMAIL
+        msg.attach(MIMEText(f"<pre style='font-family:monospace'>{body}</pre>", "html", "utf-8"))
+        with smtplib.SMTP("smtp-relay.brevo.com", 587) as srv:
+            srv.starttls()
+            srv.login(BREVO_SMTP_LOGIN, BREVO_API_KEY)
+            srv.sendmail(BREVO_SENDER, ADMIN_EMAIL, msg.as_string())
+        log(f"Admin alert envoyee: {subject}")
+    except Exception as e:
+        log(f"Impossible d envoyer admin alert: {e}")
 
 
 def run():
@@ -749,6 +889,11 @@ def run():
                     if zone_key not in notified:
                         log_zone_elargie(user, adr, enquete, dist)
                         notified[zone_key] = datetime.now().isoformat()
+
+    # IDEA-P03: rapport mensuel
+    log("Rapports mensuels...")
+    for user in users:
+        send_monthly_confirmation(user, notified, enquetes)
 
     save_notified(notified)
     log("=" * 50)

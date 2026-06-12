@@ -200,3 +200,98 @@ def test_rappel_j7_pas_doublon():
             phemeapp.send_rappel_j7(user, notified, [enquete])  # 2ème fois
 
     assert len(emails_envoyes) == 1  # envoyé une seule fois
+
+
+# ─────────────────────────────────────────────
+# TESTS IDEA-T13 : Déduplication intelligente
+# ─────────────────────────────────────────────
+
+def test_already_notified_similar_vide():
+    """Dictionnaire vide → pas de doublon."""
+    import phemeapp
+    enquete = {"lieu": "Chemin du Test", "commune": "Testville", "noCamac": 1}
+    assert not phemeapp.already_notified_similar({}, "test@test.com", enquete)
+
+def test_already_notified_similar_detecte():
+    """Même lieu + commune récent → doublon détecté."""
+    import phemeapp
+    from datetime import datetime
+    notified = {
+        "test@test.com:99999": datetime.now().isoformat(),
+        "test@test.com:99999:ctx": "chemin du test|testville"
+    }
+    enquete = {"lieu": "Chemin du Test", "commune": "Testville", "noCamac": 11111}
+    assert phemeapp.already_notified_similar(notified, "test@test.com", enquete)
+
+def test_already_notified_similar_commune_differente():
+    """Même lieu mais commune différente → pas de doublon."""
+    import phemeapp
+    from datetime import datetime
+    notified = {
+        "test@test.com:99999": datetime.now().isoformat(),
+        "test@test.com:99999:ctx": "chemin du test|autrevillage"
+    }
+    enquete = {"lieu": "Chemin du Test", "commune": "Testville", "noCamac": 11111}
+    assert not phemeapp.already_notified_similar(notified, "test@test.com", enquete)
+
+# ─────────────────────────────────────────────
+# TESTS IDEA-U01 : Magic link
+# ─────────────────────────────────────────────
+
+def test_magic_token_longueur():
+    """Token magic link = 32 caractères."""
+    import phemeapp
+    token = phemeapp.generate_magic_token("test@test.com")
+    assert len(token) == 32
+
+def test_magic_token_deterministe():
+    """Même email → même token ce mois."""
+    import phemeapp
+    t1 = phemeapp.generate_magic_token("arnaud@test.com")
+    t2 = phemeapp.generate_magic_token("arnaud@test.com")
+    assert t1 == t2
+
+def test_verify_magic_token_valide():
+    """Token du mois courant est valide."""
+    import phemeapp
+    email = "test@test.com"
+    token = phemeapp.generate_magic_token(email)
+    assert phemeapp.verify_magic_token(email, token)
+
+def test_verify_magic_token_invalide():
+    """Token aléatoire est invalide."""
+    import phemeapp
+    assert not phemeapp.verify_magic_token("test@test.com", "token_invalide_xxxx")
+
+def test_get_magic_link_format():
+    """Magic link contient le token et l'email."""
+    import phemeapp
+    email = "arnaud@test.com"
+    link = phemeapp.get_magic_link(email)
+    assert "token=" in link
+    assert "email=" in link
+
+# ─────────────────────────────────────────────
+# TESTS IDEA-T03 : fetch_enquetes_with_retry
+# ─────────────────────────────────────────────
+
+def test_fetch_retry_retourne_resultat():
+    """fetch_enquetes_with_retry retourne le résultat si API OK."""
+    import phemeapp
+    from unittest.mock import patch
+    with patch.object(phemeapp, "fetch_enquetes", return_value=[{"noCamac": 1}]):
+        result = phemeapp.fetch_enquetes_with_retry()
+    assert len(result) == 1
+
+def test_fetch_retry_retente_si_vide():
+    """Retry si premier appel retourne vide."""
+    import phemeapp
+    from unittest.mock import patch
+    calls = []
+    def mock_fetch(days=30):
+        calls.append(1)
+        return [] if len(calls) < 2 else [{"noCamac": 1}]
+    with patch.object(phemeapp, "fetch_enquetes", side_effect=mock_fetch):
+        result = phemeapp.fetch_enquetes_with_retry(delay=0)
+    assert len(result) == 1
+    assert len(calls) == 2

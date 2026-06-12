@@ -398,6 +398,12 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
     except:
         jours_restants = 30
         urgence = False
+    # Variables couleur pour le HTML (evite ternaires dans f-strings)
+    bg_alerte     = "#fee2e2" if urgence else "#fff8e1"
+    border_alerte = "#dc2626" if urgence else "#f59e0b"
+    color_alerte  = "#991b1b" if urgence else "#92400e"
+    prefix_alerte = "\u26a0\ufe0f URGENT \u2014 " if urgence else "\u23f1 "
+    jours_txt     = f"{jours_restants} jour{'s' if jours_restants > 1 else ''}"
     no_camac    = enquete.get("noCamac", "?")
     lieu        = enquete.get("lieu", "—")
     commune     = enquete.get("commune", "—")
@@ -423,7 +429,7 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
         <em>« {adresse['label']} — {adresse['adresse']} »</em>.</p>
 
         <div style="background:#fff8e1;border-left:4px solid #f59e0b;padding:14px 18px;margin:20px 0;border-radius:4px;">
-          <strong style="color:{'#991b1b' if urgence else '#92400e'}">{'⚠️ URGENT — ' if urgence else '⏱ '}{jours_restants} jour{'s' if jours_restants > 1 else ''} pour faire opposition</strong><br>
+          <strong style="color:{color_alerte}">{prefix_alerte}{jours_txt} pour faire opposition</strong><br>
           <span style="font-size:13px;color:{'#991b1b' if urgence else '#92400e'}">Date FAO : <strong>{date_fao}</strong> — d&eacute;lai l&eacute;gal de 30 jours.</span>
         </div>
 

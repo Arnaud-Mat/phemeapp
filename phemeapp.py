@@ -935,6 +935,84 @@ def send_monthly_confirmation(user, notified):
         log(f"  Erreur rapport mensuel {email}: {e}")
 
 
+def send_rappel_j7(user, notified, enquetes):
+    """
+    IDEA-P11: Rappel envoyé J-7 avant fin du délai d'opposition (30j depuis FAO).
+    Envoyé une seule fois par enquête par utilisateur.
+    Seulement pour les enquêtes dans le périmètre de 500m.
+    """
+    email  = user["email"]
+    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+
+    for adr in user["adresses"]:
+        if not adr.get("lat"):
+            continue
+        for enquete in enquetes:
+            if not enquete.get("lat"):
+                continue
+            dist = haversine_m(adr["lat"], adr["lng"], enquete["lat"], enquete["lng"])
+            if dist > PERIMETER_M:
+                continue
+
+            no_camac = enquete.get("noCamac", "?")
+            key_rappel = f"rappel7:{email}:{no_camac}"
+            if key_rappel in notified:
+                continue  # déjà envoyé
+
+            # Calculer les jours restants
+            try:
+                ts_ms = enquete.get("dateFao", 0)
+                date_pub = datetime.fromtimestamp(ts_ms / 1000)
+                date_limite = date_pub + timedelta(days=30)
+                jours_restants = (date_limite - datetime.now()).days
+            except:
+                continue
+
+            # Envoyer seulement si entre 5 et 8 jours restants
+            if not (5 <= jours_restants <= 8):
+                continue
+
+            lieu     = enquete.get("lieu", "--")
+            commune  = enquete.get("commune", "--")
+            nature   = enquete.get("natureTravaux", "--")
+            date_fao = format_date(ts_ms)
+            commune_url = find_commune_enquetes_url(commune.upper()) if commune else None
+            lien     = commune_url if commune_url else FAO_BASE_URL
+
+            html = (
+                "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"
+                "<div style='background:#dc2626;padding:18px 24px'>"
+                "<h1 style='color:white;margin:0;font-size:20px'>⚠️ PhémeApp — Rappel urgent</h1>"
+                "<p style='color:#fecaca;margin:4px 0 0;font-size:12px'>Délai d'opposition bientôt expiré</p>"
+                "</div><div style='padding:24px'>"
+                f"<p style='font-size:16px'>Bonjour {prenom},</p>"
+                f"<p style='font-size:14px;color:#444;line-height:1.7'>Il vous reste <strong style='color:#dc2626;font-size:18px'>{jours_restants} jours</strong> pour faire opposition à une mise à l'enquête proche de <em>{adr['label']} — {adr['adresse']}</em>.</p>"
+                "<div style='background:#fee2e2;border:2px solid #dc2626;padding:16px 18px;margin:16px 0;border-radius:6px'>"
+                f"<p style='margin:0 0 8px;font-size:14px;color:#991b1b;font-weight:bold'>📍 {lieu}, {commune}</p>"
+                f"<p style='margin:0 0 4px;font-size:13px;color:#7f1d1d'><strong>Nature :</strong> {nature}</p>"
+                f"<p style='margin:0 0 4px;font-size:13px;color:#7f1d1d'><strong>Publié le :</strong> {date_fao}</p>"
+                f"<p style='margin:0;font-size:13px;color:#7f1d1d'><strong>Distance :</strong> {round(dist)} m de votre adresse</p>"
+                "</div>"
+                "<p style='font-size:14px;color:#444;line-height:1.7'>Le délai légal de 30 jours pour déposer une opposition court depuis la date de publication. <strong>Passé ce délai, vous ne pourrez plus vous opposer.</strong></p>"
+                f"<div style='text-align:center;margin:24px 0'><a href='{lien}' style='background:#dc2626;color:white;padding:14px 28px;text-decoration:none;border-radius:6px;font-size:15px;font-weight:bold'>Consulter le dossier →</a></div>"
+                "<p style='font-size:13px;color:#666'>En cas de doute, n'hésitez pas à contacter votre commune ou un avocat spécialisé en droit public.</p>"
+                "<p style='font-size:14px;color:#444'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
+                f"<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+                "</div></body></html>"
+            )
+
+            try:
+                smtp_send(
+                    email,
+                    f"⚠️ Plus que {jours_restants} jours pour vous opposer — {commune}",
+                    html
+                )
+                notified[key_rappel] = datetime.now().isoformat()
+                log(f"  Rappel J-7 envoyé -> {email} (CAMAC {no_camac}, J-{jours_restants})")
+            except Exception as e:
+                log(f"  Erreur rappel J-7 {email}: {e}", "error")
+
+
 def ping_healthcheck(fail=False):
     """IDEA-T05: Ping healthcheck.io pour monitorer le cron."""
     if not HEALTHCHECK_URL:

@@ -295,3 +295,104 @@ def test_fetch_retry_retente_si_vide():
         result = phemeapp.fetch_enquetes_with_retry(delay=0)
     assert len(result) == 1
     assert len(calls) == 2
+
+
+# ─────────────────────────────────────────────
+# TESTS IDEA-T16 : Purge notified.json
+# ─────────────────────────────────────────────
+
+def test_purge_old_notified_vide():
+    """Dictionnaire vide reste vide après purge."""
+    import phemeapp
+    result = phemeapp.purge_old_notified({})
+    assert result == {}
+
+def test_purge_old_notified_garde_recents():
+    """Les entrées récentes ne sont pas supprimées."""
+    import phemeapp
+    from datetime import datetime
+    notified = {"test@test.com:12345": datetime.now().isoformat()}
+    result = phemeapp.purge_old_notified(notified, max_days=90)
+    assert "test@test.com:12345" in result
+
+def test_purge_old_notified_supprime_anciens():
+    """Les entrées de plus de 90 jours sont supprimées."""
+    import phemeapp
+    from datetime import datetime, timedelta
+    old_date = (datetime.now() - timedelta(days=100)).isoformat()
+    notified = {"test@test.com:99999": old_date}
+    result = phemeapp.purge_old_notified(notified, max_days=90)
+    assert "test@test.com:99999" not in result
+
+def test_purge_garde_welcome():
+    """Les clés welcome: sont toujours gardées."""
+    import phemeapp
+    from datetime import datetime, timedelta
+    old_date = (datetime.now() - timedelta(days=200)).isoformat()
+    notified = {
+        "welcome:test@test.com": old_date,
+        "test@test.com:12345": old_date
+    }
+    result = phemeapp.purge_old_notified(notified, max_days=90)
+    assert "welcome:test@test.com" in result
+    assert "test@test.com:12345" not in result
+
+# ─────────────────────────────────────────────
+# TESTS IDEA-T03 : Cache CAMAC
+# ─────────────────────────────────────────────
+
+def test_get_cached_camac_ids_vide():
+    """Dictionnaire vide → aucun ID en cache."""
+    import phemeapp
+    assert len(phemeapp.get_cached_camac_ids({})) == 0
+
+def test_get_cached_camac_ids_recent():
+    """Entrée récente → ID en cache."""
+    import phemeapp
+    from datetime import datetime
+    notified = {"test@test.com:42": datetime.now().isoformat()}
+    ids = phemeapp.get_cached_camac_ids(notified)
+    assert "42" in ids
+
+def test_is_new_enquete_inconnu():
+    """noCamac inconnu → nouvelle enquête."""
+    import phemeapp
+    assert phemeapp.is_new_enquete(99999, {})
+
+def test_is_new_enquete_connu():
+    """noCamac déjà vu → pas nouvelle."""
+    import phemeapp
+    from datetime import datetime
+    notified = {"test@test.com:42": datetime.now().isoformat()}
+    assert not phemeapp.is_new_enquete(42, notified)
+
+# ─────────────────────────────────────────────
+# TESTS IDEA-P19 : Dossiers retirés
+# ─────────────────────────────────────────────
+
+def test_check_dossiers_retires_pas_de_retrait():
+    """Dossier encore présent dans CAMAC → pas de notification."""
+    import phemeapp
+    from datetime import datetime
+    emails_envoyes = []
+    from unittest.mock import patch
+    with patch.object(phemeapp, "smtp_send", side_effect=lambda d,s,h: emails_envoyes.append(d)):
+        user = {"email": "test@test.com", "nom": "Test", "adresses": []}
+        notified = {"test@test.com:42": datetime.now().isoformat()}
+        enquetes = [{"noCamac": 42, "lat": 46.5, "lng": 6.5}]
+        phemeapp.check_dossiers_retires(user, notified, enquetes)
+    assert len(emails_envoyes) == 0  # Dossier encore là → pas de notification
+
+def test_check_dossiers_retires_notifie_retrait():
+    """Dossier disparu récemment → notification envoyée."""
+    import phemeapp
+    from datetime import datetime, timedelta
+    emails_envoyes = []
+    from unittest.mock import patch
+    with patch.object(phemeapp, "smtp_send", side_effect=lambda d,s,h: emails_envoyes.append(d)):
+        user = {"email": "test@test.com", "nom": "Test", "adresses": []}
+        # Dossier alerté il y a 10 jours
+        notified = {"test@test.com:42": (datetime.now() - timedelta(days=10)).isoformat()}
+        enquetes = []  # Dossier 42 n'est plus là
+        phemeapp.check_dossiers_retires(user, notified, enquetes)
+    assert len(emails_envoyes) == 1

@@ -337,6 +337,20 @@ def mark_welcome_sent(notified, email):
 # 6. EMAIL DE BIENVENUE
 # ─────────────────────────────────────────────
 
+
+def smtp_send(dest, subject, html):
+    """Envoie un email HTML via Brevo SMTP."""
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = f"{BREVO_SENDER_NAME} <{BREVO_SENDER}>"
+    msg["To"]      = dest
+    msg.attach(MIMEText(html, "html", "utf-8"))
+    with smtplib.SMTP("smtp-relay.brevo.com", 587) as srv:
+        srv.starttls()
+        srv.login(BREVO_SMTP_LOGIN, BREVO_API_KEY)
+        srv.sendmail(BREVO_SENDER, dest, msg.as_string())
+
+
 def send_welcome_email(dest_email, dest_nom, adresses):
     prenom = dest_nom.split()[0] if dest_nom else "bonjour"
     adresses_html = "".join([

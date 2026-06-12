@@ -1485,6 +1485,89 @@ def generate_admin_dashboard(notified, users, enquetes):
         log(f"Erreur génération dashboard: {e}", "error")
 
 
+def check_dossiers_retires(user, notified, enquetes):
+    """
+    IDEA-P19: Vérifie si un dossier alerté précédemment a disparu de CAMAC.
+    Si un noCamac notifié n'est plus dans les enquêtes actuelles ET
+    que le délai de 30j n'est pas encore écoulé → notifier le retrait.
+    """
+    email = user["email"]
+    camac_actuels = {str(e.get("noCamac")) for e in enquetes}
+
+    for key, val in list(notified.items()):
+        # Format clé: email:noCamac
+        if not key.startswith(f"{email}:"):
+            continue
+        parts = key.split(":")
+        if len(parts) != 2:
+            continue
+        no_camac = parts[1]
+        if not no_camac.isdigit():
+            continue
+
+        key_retire = f"retire:{email}:{no_camac}"
+        if key_retire in notified:
+            continue  # Déjà notifié du retrait
+
+        # Vérifier si le dossier était récent (< 35 jours)
+        try:
+            date_alerte = datetime.fromisoformat(val)
+            jours = (datetime.now() - date_alerte).days
+            if jours > 35:
+                continue  # Trop vieux, normal qu'il soit parti
+        except:
+            continue
+
+        # Le dossier n'est plus dans CAMAC
+        if no_camac not in camac_actuels:
+            prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+            unsub_lien = get_unsub_link(email)
+
+            html = (
+                "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"
+                "<div style='background:#1a3a5c;padding:18px 24px'>"
+                "<h1 style='color:white;margin:0;font-size:20px'>PhémeApp</h1>"
+                "<p style='color:#a8c4e0;margin:4px 0 0;font-size:12px'>Mise à jour d'un dossier</p>"
+                "</div><div style='padding:24px'>"
+                f"<p style='font-size:16px'>Bonjour {prenom},</p>"
+                f"<div style='background:#f0fdf4;border-left:3px solid #1a7a4a;padding:14px 18px;margin:16px 0;border-radius:0 6px 6px 0'>"
+                f"<strong style='color:#0f4a2a'>✅ Dossier retiré — No CAMAC {no_camac}</strong>"
+                f"<p style='margin:8px 0 0;font-size:13px;color:#1a5c35;line-height:1.6'>La mise à l'enquête que nous vous avions signalée (No CAMAC {no_camac}) n'apparaît plus dans les publications officielles. Le projet a probablement été retiré ou clôturé.</p>"
+                "</div>"
+                "<p style='font-size:14px;color:#444;line-height:1.7'>Si vous avez déposé une opposition ou si vous avez des questions, nous vous recommandons de contacter directement votre commune pour confirmation.</p>"
+                "<p style='font-size:14px;color:#444;margin-top:16px'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
+                f"<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+                "</div></body></html>"
+            )
+
+            try:
+                smtp_send(email, f"PhémeApp — Dossier retiré (No {no_camac})", html)
+                notified[key_retire] = datetime.now().isoformat()
+                log(f"  Retrait dossier notifié -> {email} (CAMAC {no_camac})")
+            except Exception as e:
+                log(f"  Erreur notification retrait {email}: {e}", "error")
+
+
+CAMAC_CACHE_TTL_DAYS = 35  # Garder le cache 35 jours (légèrement > délai légal)
+
+def get_cached_camac_ids(notified):
+    """IDEA-T03: Retourne les noCamac déjà connus (toutes adresses confondues)."""
+    cached = set()
+    cutoff = (datetime.now() - timedelta(days=CAMAC_CACHE_TTL_DAYS)).isoformat()
+    for key, val in notified.items():
+        if ":" not in key or key.startswith("welcome:") or key.startswith("monthly:"):
+            continue
+        parts = key.split(":")
+        if len(parts) >= 2 and parts[-1].isdigit():
+            if isinstance(val, str) and val > cutoff:
+                cached.add(parts[-1])
+    return cached
+
+def is_new_enquete(no_camac, notified):
+    """True si cette enquête n'a jamais été vue (pour les stats uniquement — pas de filtre)."""
+    return str(no_camac) not in get_cached_camac_ids(notified)
+
+
 def purge_old_notified(notified, max_days=90):
     """
     IDEA-T16: Supprime les entrées de plus de max_days jours dans notified.

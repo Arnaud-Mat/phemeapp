@@ -444,6 +444,7 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
     jours_txt     = f"{jours_restants} jour{'s' if jours_restants > 1 else ''}"
     no_camac    = enquete.get("noCamac", "?")
     unsub_lien  = get_unsub_link(dest_email)
+    magic_lien   = get_magic_link(dest_email)
     lieu        = enquete.get("lieu", "—")
     commune     = enquete.get("commune", "—")
     description = enquete.get("description", "—")
@@ -1148,6 +1149,47 @@ def handle_unsubscribe_in_sheet(email):
     except Exception as e:
         log(f"  Erreur désinscription {email}: {e}", "error")
         return False
+
+
+MAGIC_LINK_BASE = os.environ.get("MAGIC_LINK_BASE", "https://phemeapp.ch/mon-compte")
+MAGIC_LINK_SECRET = os.environ.get("MAGIC_LINK_SECRET", "phemeapp-magic-2026")
+
+def generate_magic_token(email):
+    """
+    IDEA-U01: Token magic link valide 30 jours.
+    Basé sur email + mois courant + secret.
+    Renouvelé automatiquement chaque mois.
+    """
+    import hashlib
+    mois = datetime.now().strftime("%Y-%m")
+    raw = f"{email}:{mois}:{MAGIC_LINK_SECRET}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+def get_magic_link(email):
+    """Retourne l'URL complète de l'espace utilisateur."""
+    from urllib.parse import quote as _quote
+    token = generate_magic_token(email)
+    return f"{MAGIC_LINK_BASE}?token={token}&email={_quote(email)}"
+
+def verify_magic_token(email, token):
+    """Vérifie qu'un token est valide pour cet email (mois courant ou précédent)."""
+    for delta in [0, -1]:
+        from datetime import date
+        import calendar
+        d = datetime.now()
+        # Reculer d'un mois si delta = -1
+        if delta == -1:
+            if d.month == 1:
+                d = d.replace(year=d.year-1, month=12)
+            else:
+                d = d.replace(month=d.month-1)
+        mois = d.strftime("%Y-%m")
+        import hashlib
+        raw = f"{email}:{mois}:{MAGIC_LINK_SECRET}"
+        expected = hashlib.sha256(raw.encode()).hexdigest()[:32]
+        if token == expected:
+            return True
+    return False
 
 
 def ping_healthcheck(fail=False):

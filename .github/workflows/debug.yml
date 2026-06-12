@@ -12,7 +12,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install requests
-      - name: Debug PhemeApp
+      - name: Run and capture output
         env:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
@@ -21,5 +21,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          python3 phemeapp.py 2>&1 || true
-          echo "Exit code: $?"
+          set +e
+          output=$(python3 phemeapp.py 2>&1)
+          exit_code=$?
+          echo "$output"
+          echo "---EXIT CODE: $exit_code---"
+          if [ $exit_code -ne 0 ]; then
+            # Afficher les 20 dernières lignes comme erreur visible
+            last_lines=$(echo "$output" | tail -20)
+            echo "::error::EXIT $exit_code - Dernières lignes: $last_lines"
+          fi
+          exit 0

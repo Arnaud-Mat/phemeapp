@@ -969,11 +969,16 @@ def run():
     log("Géocodage des adresses...")
     users = geocode_users(users)
 
-    log(f"Récupération des mises a l'enquête ({SEARCH_DAYS}j)...")
+    # IDEA-P03: rapport mensuel AVANT fetch (basé sur historique Sheet, indépendant API CAMAC)
+    log("Rapports mensuels depuis historique Sheet...")
+    for user in users:
+        send_monthly_confirmation(user, notified)
+
+    log(f"Récupération des mises à l'enquête ({SEARCH_DAYS}j)...")
     enquetes = fetch_enquetes()
 
     if not enquetes:
-        log("Aucune mise à l'enquête — fin.")
+        log("Aucune mise à l'enquête récupérée — fin.")
         save_notified(notified)
         return
 
@@ -1003,11 +1008,6 @@ def run():
                     if zone_key not in notified:
                         log_zone_elargie(user, adr, enquete, dist)
                         notified[zone_key] = datetime.now().isoformat()
-
-    # IDEA-P03: rapport mensuel depuis l historique Sheet
-    log("Rapports mensuels depuis historique Sheet...")
-    for user in users:
-        send_monthly_confirmation(user, notified)
 
     save_notified(notified)
     log("=" * 50)

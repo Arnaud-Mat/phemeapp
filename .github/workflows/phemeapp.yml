@@ -3,30 +3,43 @@ name: PhemeApp - Detection quotidienne
 on:
   schedule:
     - cron: "0 6 * * *"  # 7h heure suisse (UTC+1)
-  workflow_dispatch:      # permet de lancer manuellement depuis GitHub
+  workflow_dispatch:
 
 permissions:
-  contents: write         # necessaire pour ecrire notified.json dans le repo
+  contents: write
 
 jobs:
-  run-phemeapp:
+  tests:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install dependencies
+        run: pip install requests pytest
+      - name: Run tests
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SENDER: ${{ secrets.BREVO_SENDER }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: pytest tests/ -v --tb=short
 
+  run-phemeapp:
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Install dependencies
         run: pip install requests
-
       - name: Create logs directory
         run: mkdir -p logs
-
       - name: Run PhemeApp
         env:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
@@ -35,8 +48,10 @@ jobs:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          APPS_SCRIPT_WEBAPP_URL: ${{ secrets.APPS_SCRIPT_WEBAPP_URL }}
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: python3 phemeapp.py
-
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4

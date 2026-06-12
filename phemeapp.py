@@ -715,10 +715,95 @@ def log_zone_elargie(user, adr, enquete, distance_m):
     log(f"  Zone élargie enregistrée: CAMAC {row['no_camac']} ({row['distance_m']}m)")
 
 
-def send_monthly_confirmation(user, notified, enquetes):
+def load_historique_from_sheet(email, mois):
     """
-    IDEA-P03: Email mensuel confirmant que la surveillance est active.
-    Montre les publications les plus proches ce mois. Max 1x/mois/utilisateur.
+    Lit l onglet 'Historique Alertes' du Sheet pour un utilisateur et un mois donnés.
+    Retourne la liste des alertes envoyées ce mois.
+    Colonnes: date_envoi, email, nom, label_adresse, adresse, no_camac,
+              lieu, commune, nature_travaux, distance_m, date_fao, lien
+    """
+    try:
+        url = (
+            f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
+            f"/gviz/tq?tqx=out:csv&sheet={requests.utils.quote(SHEET_HISTORIQUE)}"
+        )
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        import csv as _csv, io as _io
+        reader = _csv.reader(_io.StringIO(r.text))
+        rows = list(reader)
+        if not rows:
+            return []
+        # Skip header
+        alertes = []
+        for row in rows[1:]:
+            if len(row) < 10:
+                continue
+            row_email = row[1].strip()
+            row_date  = row[0].strip()  # format ISO: 2026-06-12T...
+            row_mois  = row_date[:7]    # 2026-06
+            if row_email == email and row_mois == mois:
+                alertes.append({
+                    "date_envoi":    row[0],
+                    "email":         row[1],
+                    "nom":           row[2],
+                    "label_adresse": row[3],
+                    "adresse":       row[4],
+                    "no_camac":      row[5],
+                    "lieu":          row[6],
+                    "commune":       row[7],
+                    "nature_travaux":row[8],
+                    "distance_m":    row[9],
+                    "date_fao":      row[10] if len(row) > 10 else "",
+                    "lien":          row[11] if len(row) > 11 else "",
+                })
+        return alertes
+    except Exception as e:
+        log(f"  Lecture Historique Sheet impossible: {e}")
+        return []
+
+
+def load_zone_elargie_from_sheet(email, mois):
+    """
+    Lit l onglet 'Zone Elargie' du Sheet pour un utilisateur et un mois donnés.
+    Retourne les publications entre 500m et 2km ce mois.
+    """
+    try:
+        url = (
+            f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
+            f"/gviz/tq?tqx=out:csv&sheet={requests.utils.quote(SHEET_ZONE)}"
+        )
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        import csv as _csv, io as _io
+        reader = _csv.reader(_io.StringIO(r.text))
+        rows = list(reader)
+        zone = []
+        for row in rows[1:]:
+            if len(row) < 10:
+                continue
+            row_email = row[1].strip()
+            row_mois  = row[0].strip()[:7]
+            if row_email == email and row_mois == mois:
+                zone.append({
+                    "lieu":          row[6],
+                    "commune":       row[7],
+                    "nature_travaux":row[8],
+                    "distance_m":    row[9],
+                    "date_fao":      row[10] if len(row) > 10 else "",
+                    "lien":          row[11] if len(row) > 11 else "",
+                })
+        return zone
+    except Exception as e:
+        log(f"  Lecture Zone Elargie Sheet impossible: {e}")
+        return []
+
+
+def send_monthly_confirmation(user, notified):
+    """
+    IDEA-P03: Email mensuel basé sur l historique réel du Sheet.
+    Source: onglet 'Historique Alertes' (alertes envoyées) + 'Zone Elargie' (activité autour).
+    Max 1x/mois/utilisateur.
     """
     email = user["email"]
     mois  = datetime.now().strftime("%Y-%m")
@@ -727,91 +812,111 @@ def send_monthly_confirmation(user, notified, enquetes):
         return
 
     prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
-    total  = len(enquetes)
 
-    # 5 publications les plus proches toutes adresses confondues
-    proches = []
-    for adr in user["adresses"]:
-        if not adr.get("lat"):
-            continue
-        for e in enquetes:
-            if e.get("lat") and e.get("lng"):
-                d = haversine_m(adr["lat"], adr["lng"], e["lat"], e["lng"])
-                if d <= 2000:
-                    proches.append((d, e, adr["label"]))
-    proches.sort(key=lambda x: x[0])
-    proches = proches[:5]
+    # Lire l historique réel depuis le Sheet
+    alertes_mois = load_historique_from_sheet(email, mois)
+    zone_mois    = load_zone_elargie_from_sheet(email, mois)
+    nb_alertes   = len(alertes_mois)
+    nb_zone      = len(zone_mois)
 
-    alerte_500 = sum(1 for d, _, _ in proches if d <= 500)
-    couleur_header = "#dc2626" if alerte_500 else "#1a7a4a"
-    msg_statut = (
-        f"⚠️ {alerte_500} publication(s) dans votre périmètre ce mois"
-        if alerte_500 else
-        "✅ Aucune mise à l'enquête dans votre périmètre ce mois"
-    )
+    couleur_statut = "#dc2626" if nb_alertes > 0 else "#1a7a4a"
+    if nb_alertes > 0:
+        msg_statut = f"⚠️ {nb_alertes} mise{'s' if nb_alertes > 1 else ''} à l'enquête dans votre périmètre ce mois"
+    else:
+        msg_statut = "✅ Aucune mise à l'enquête dans votre périmètre ce mois"
 
-    rows_html = ""
-    for dist, e, label in proches:
-        commune  = e.get("commune", "--")
-        nature   = (e.get("natureTravaux") or "--")[:50]
-        date_fao = format_date(e.get("dateFao", 0))
-        col      = "#dc2626" if dist <= 500 else "#f59e0b" if dist <= 1000 else "#888"
-        rows_html += (
+    # Tableau des alertes envoyées ce mois
+    rows_alertes = ""
+    for a in alertes_mois:
+        rows_alertes += (
             f"<tr style='border-bottom:1px solid #eee'>"
-            f"<td style='padding:7px 8px;color:{col};font-weight:bold'>{round(dist)}m</td>"
-            f"<td style='padding:7px 8px'>{commune}</td>"
-            f"<td style='padding:7px 8px;font-size:12px;color:#666'>{nature}</td>"
-            f"<td style='padding:7px 8px;font-size:12px'>{date_fao}</td>"
-            f"<td style='padding:7px 8px;font-size:11px;color:#888'>{label}</td>"
+            f"<td style='padding:7px 8px;color:#dc2626;font-weight:bold'>{a['distance_m']}m</td>"
+            f"<td style='padding:7px 8px'>{a['commune']}</td>"
+            f"<td style='padding:7px 8px;font-size:12px;color:#666'>{a['nature_travaux'][:50]}</td>"
+            f"<td style='padding:7px 8px;font-size:12px'>{a['date_fao']}</td>"
+            f"<td style='padding:7px 8px;font-size:11px;color:#888'>{a['label_adresse']}</td>"
             f"</tr>"
         )
+
+    # Tableau zone élargie (500m–2km)
+    rows_zone = ""
+    for z in zone_mois[:5]:
+        rows_zone += (
+            f"<tr style='border-bottom:1px solid #eee'>"
+            f"<td style='padding:7px 8px;color:#f59e0b;font-weight:bold'>{z['distance_m']}m</td>"
+            f"<td style='padding:7px 8px'>{z['commune']}</td>"
+            f"<td style='padding:7px 8px;font-size:12px;color:#666'>{z['nature_travaux'][:50]}</td>"
+            f"<td style='padding:7px 8px;font-size:12px'>{z['date_fao']}</td>"
+            f"</tr>"
+        )
+
+    # Calculer le nombre total analysé depuis le Sheet
+    # (si Sheet vide, on ne peut pas savoir — on indique juste le mois)
+    mois_label = datetime.now().strftime("%B %Y")
 
     html = (
         "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"
         "<div style='background:#1a3a5c;padding:18px 24px'>"
         "<h1 style='color:white;margin:0;font-size:20px'>PhémeApp</h1>"
-        f"<p style='color:#a8c4e0;margin:4px 0 0;font-size:12px'>Rapport mensuel — {datetime.now().strftime('%B %Y')}</p>"
+        f"<p style='color:#a8c4e0;margin:4px 0 0;font-size:12px'>Rapport mensuel — {mois_label}</p>"
         "</div><div style='padding:24px'>"
         f"<p style='font-size:16px'>Bonjour {prenom},</p>"
-        f"<p style='font-size:14px;color:#444;line-height:1.7'>Votre surveillance PhémeApp est <strong style='color:#1a7a4a'>active</strong>. "
-        f"Ce mois, notre système a analysé <strong>{total} mises à l'enquête</strong> dans le canton de Vaud.</p>"
-        f"<div style='background:#f0fdf4;border-left:3px solid {couleur_header};padding:14px 18px;margin:16px 0;border-radius:0 6px 6px 0'>"
-        f"<strong style='color:{couleur_header}'>{msg_statut}</strong></div>"
+        "<p style='font-size:14px;color:#444;line-height:1.7'>"
+        "Votre surveillance PhémeApp est <strong style='color:#1a7a4a'>active</strong>. "
+        f"Voici le bilan de votre surveillance pour <strong>{mois_label}</strong>.</p>"
+        f"<div style='background:#f0fdf4;border-left:3px solid {couleur_statut};padding:14px 18px;margin:16px 0;border-radius:0 6px 6px 0'>"
+        f"<strong style='color:{couleur_statut}'>{msg_statut}</strong></div>"
     )
 
-    if proches:
+    # Section alertes envoyées
+    if alertes_mois:
         html += (
-            "<p style='font-size:14px;color:#444;margin-top:16px'>Publications les plus proches ce mois :</p>"
+            "<p style='font-size:14px;color:#444;margin-top:16px;font-weight:500'>"
+            "📬 Alertes envoyées ce mois :</p>"
             "<table style='width:100%;border-collapse:collapse;font-size:13px'>"
-            "<tr style='background:#f0f4f8'>"
+            "<tr style='background:#fee2e2'>"
             "<th style='padding:7px 8px;text-align:left'>Distance</th>"
             "<th style='padding:7px 8px;text-align:left'>Commune</th>"
             "<th style='padding:7px 8px;text-align:left'>Nature</th>"
             "<th style='padding:7px 8px;text-align:left'>FAO</th>"
             "<th style='padding:7px 8px;text-align:left'>Adresse</th></tr>"
-            + rows_html + "</table>"
+            + rows_alertes + "</table>"
         )
-    else:
-        html += "<p style='font-size:14px;color:#666'>Aucune publication détectée dans un rayon de 2km.</p>"
+
+    # Section zone élargie
+    if zone_mois:
+        html += (
+            f"<p style='font-size:14px;color:#444;margin-top:20px;font-weight:500'>"
+            f"📍 Activité dans un rayon de 2km ({nb_zone} publication{'s' if nb_zone > 1 else ''}) :</p>"
+            "<table style='width:100%;border-collapse:collapse;font-size:13px'>"
+            "<tr style='background:#fff8e1'>"
+            "<th style='padding:7px 8px;text-align:left'>Distance</th>"
+            "<th style='padding:7px 8px;text-align:left'>Commune</th>"
+            "<th style='padding:7px 8px;text-align:left'>Nature</th>"
+            "<th style='padding:7px 8px;text-align:left'>FAO</th></tr>"
+            + rows_zone + "</table>"
+            "<p style='font-size:11px;color:#888;margin-top:4px'>Ces publications sont hors de votre périmètre de 500m — aucune alerte envoyée.</p>"
+        )
+
+    if not alertes_mois and not zone_mois:
+        html += "<p style='font-size:14px;color:#666'>Aucune activité détectée dans un rayon de 2km ce mois.</p>"
 
     html += (
         "<p style='font-size:14px;color:#444;margin-top:20px'>Bien cordialement,<br>"
         "<strong>L'équipe PhémeApp</strong></p>"
         "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>"
-        "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;&nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+        "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. "
+        f"&nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
         "</div></body></html>"
     )
 
     try:
-        smtp_send(email, f"PhémeApp — Rapport {datetime.now().strftime('%B %Y')}", html)
+        smtp_send(email, f"PhémeApp — Rapport {mois_label}", html)
         notified[key] = datetime.now().isoformat()
-        log(f"  Rapport mensuel envoyé -> {email}")
+        log(f"  Rapport mensuel envoyé -> {email} ({nb_alertes} alertes, {nb_zone} zone élargie)")
     except Exception as e:
         log(f"  Erreur rapport mensuel {email}: {e}")
 
-
-HEALTHCHECK_URL = os.environ.get("HEALTHCHECK_URL", "")
-ADMIN_EMAIL     = os.environ.get("ADMIN_EMAIL", "arnaud.mathier@gmail.com")
 
 def ping_healthcheck(fail=False):
     """IDEA-T05: Ping healthcheck.io pour monitorer le cron."""
@@ -899,13 +1004,10 @@ def run():
                         log_zone_elargie(user, adr, enquete, dist)
                         notified[zone_key] = datetime.now().isoformat()
 
-    # IDEA-P03: rapport mensuel (seulement si l API a retourne des resultats)
-    if enquetes:
-        log("Rapports mensuels...")
-        for user in users:
-            send_monthly_confirmation(user, notified, enquetes)
-    else:
-        log("Rapport mensuel ignore: API CAMAC n a retourne aucune donnee")
+    # IDEA-P03: rapport mensuel depuis l historique Sheet
+    log("Rapports mensuels depuis historique Sheet...")
+    for user in users:
+        send_monthly_confirmation(user, notified)
 
     save_notified(notified)
     log("=" * 50)

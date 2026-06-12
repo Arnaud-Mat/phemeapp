@@ -21,6 +21,7 @@ Dépendances :
   (rien d'autre — pas de gspread, pas de clé Google)
 """
 
+import base64
 import csv
 import io
 import json
@@ -403,7 +404,9 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
     description = enquete.get("description", "—")
     nature      = enquete.get("natureTravaux", "—")
     fao_lib     = enquete.get("faoLib", "")
-    lien        = f"{CAMAC_BASE_URL}?noCamac={no_camac}"
+    # BUG-007 fix: lien vers site communal si disponible, sinon FAO Vaud
+    commune_url = find_commune_enquetes_url(commune.upper()) if commune and commune != "—" else None
+    lien        = commune_url if commune_url else FAO_BASE_URL
     prenom      = dest_nom.split()[0] if dest_nom else "bonjour"
     dist        = round(distance_m)
 

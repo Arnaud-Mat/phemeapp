@@ -789,7 +789,7 @@ def send_monthly_confirmation(user, notified, enquetes):
         "<p style='font-size:14px;color:#444;margin-top:20px'>Bien cordialement,<br>"
         "<strong>L'équipe PhémeApp</strong></p>"
         "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>"
-        "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique.</p>"
+        "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;&nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
         "</div></body></html>"
     )
 

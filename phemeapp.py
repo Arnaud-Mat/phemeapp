@@ -62,7 +62,7 @@ PERIMETER_LARGE_M = 2000
 COMMUNE_BACKUP_URLS = {
     "AIGLE":       "https://www.aigle.ch/enquetes-publiques",
     "MONTREUX":    "https://www.montreux.ch/travaux-et-urbanisme/urbanisme/mises-a-lenquete",
-    "PREVERENGES": "https://www.preverenges.ch/informations",
+    "PREVERENGES": "https://www.preverenges.ch/informations/enquetes",
     "LAUSANNE":    "https://www.lausanne.ch/officiel/administration/travaux/urbanisme/permis-et-enquetes/mises-a-l-enquete.html",
     "MORGES":      "https://www.morges.ch/urbanisme-constructions/enquetes-publiques",
     "NYON":        "https://www.nyon.ch/fr/vie-quotidienne/construction-urbanisme/mises-a-lenquete",
@@ -768,5 +768,3 @@ SHEET_HISTORIQUE  = "Historique Alertes"
 SHEET_ZONE        = "Zone Elargie"
 PERIMETER_LARGE_M = 2000  # Zone élargie : 500m à 2km
 
-def get_sheet_csv_url(tab_name):
-    return f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={requests.utils.quote(tab_name)}"

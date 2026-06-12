@@ -47,6 +47,8 @@ BREVO_SENDER_NAME = "PhémeApp"
 # Google Sheet public (lecture seule)
 # Format: https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}
 SHEET_ID          = os.environ.get("SHEET_ID", "1YLK-KV_W7sNraeZdsyttykh1OnYU5aJOhl_NIqwFsJw")
+HEALTHCHECK_URL   = os.environ.get("HEALTHCHECK_URL", "")   # IDEA-T05: https://hc-ping.com/XXXX
+ADMIN_EMAIL       = os.environ.get("ADMIN_EMAIL", "arnaud.mathier@gmail.com")
 SHEET_TAB         = "Form Responses 1"
 
 # Périmètre de détection en mètres

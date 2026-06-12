@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon espace — PhémeApp</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f0f4f8; color: #333; min-height: 100vh; }
+
+  .header { background: #1a3a5c; padding: 18px 24px; display: flex; align-items: center; gap: 12px; }
+  .header h1 { color: white; font-size: 20px; }
+  .header p { color: #a8c4e0; font-size: 12px; margin-top: 2px; }
+
+  .container { max-width: 600px; margin: 32px auto; padding: 0 16px; }
+
+  .card { background: white; border-radius: 10px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .card h2 { font-size: 16px; color: #1a3a5c; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+
+  .status-ok { background: #f0fdf4; border-left: 3px solid #1a7a4a; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
+  .status-ok strong { color: #0f4a2a; font-size: 14px; }
+
+  .adresse-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .adresse-row:last-child { border-bottom: none; }
+  .adresse-dot { width: 10px; height: 10px; border-radius: 50%; background: #1a3a5c; flex-shrink: 0; }
+  .adresse-label { font-size: 13px; color: #888; width: 80px; flex-shrink: 0; }
+  .adresse-text { font-size: 14px; flex: 1; }
+
+  .historique-row { padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+  .historique-row:last-child { border-bottom: none; }
+  .historique-dist { color: #dc2626; font-weight: bold; display: inline-block; width: 50px; }
+  .historique-commune { color: #333; }
+  .historique-date { color: #888; font-size: 12px; margin-top: 2px; }
+
+  .btn { display: inline-block; padding: 11px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; font-family: Arial; text-decoration: none; }
+  .btn-primary { background: #1a3a5c; color: white; }
+  .btn-danger { background: #fee2e2; color: #dc2626; }
+  .btn-secondary { background: #f0f4f8; color: #333; }
+  .btn:hover { opacity: 0.9; }
+
+  .loading { text-align: center; padding: 40px; color: #888; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #1a3a5c; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-card { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 10px; padding: 24px; text-align: center; }
+  .error-card h2 { color: #dc2626; margin-bottom: 8px; }
+  .error-card p { color: #7f1d1d; font-size: 14px; line-height: 1.6; }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+  .perimetre-badge { display: inline-block; background: #e0f2fe; color: #0369a1; font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+
+  .footer-page { text-align: center; font-size: 11px; color: #aaa; margin-top: 32px; padding-bottom: 32px; }
+  .footer-page a { color: #aaa; }
+
+  @media (max-width: 480px) {
+    .container { padding: 0 12px; margin: 16px auto; }
+    .card { padding: 16px; }
+    .actions { flex-direction: column; }
+    .btn { text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>PhémeApp</h1>
+    <p>Votre espace personnel de surveillance</p>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- État de chargement -->
+  <div id="loading" class="card loading">
+    <div class="spinner"></div>
+    <p>Chargement de votre espace...</p>
+  </div>
+
+  <!-- Erreur token invalide -->
+  <div id="error" class="error-card" style="display:none">
+    <h2>Lien expiré ou invalide</h2>
+    <p>Ce lien a expiré ou n'est pas valide.<br>
+    Consultez un email récent de PhémeApp pour obtenir un nouveau lien.<br><br>
+    <a href="mailto:alerte@phemeapp.ch" style="color:#dc2626">Contacter PhémeApp</a></p>
+  </div>
+
+  <!-- Contenu principal (affiché après validation) -->
+  <div id="main" style="display:none">
+
+    <!-- Statut surveillance -->
+    <div class="card">
+      <h2>📡 Votre surveillance</h2>
+      <div class="status-ok">
+        <strong>✅ Surveillance active</strong>
+        <p style="font-size:13px;color:#1a5c35;margin-top:4px">Vérification automatique chaque matin à 8h — Canton de Vaud</p>
+      </div>
+      <div style="display:flex;gap:16px;font-size:13px;color:#555;flex-wrap:wrap">
+        <span>Périmètre : <span class="perimetre-badge">500m</span></span>
+        <span>Zone élargie : <span class="perimetre-badge">2km</span></span>
+        <span>Délai légal : <span class="perimetre-badge">30 jours</span></span>
+      </div>
+    </div>
+
+    <!-- Adresses surveillées -->
+    <div class="card">
+      <h2>📍 Adresses surveillées</h2>
+      <div id="adresses-list">
+        <p style="color:#888;font-size:14px">Chargement...</p>
+      </div>
+      <div class="actions" style="margin-top:16px">
+        <a href="mailto:alerte@phemeapp.ch?subject=Modifier%20mes%20adresses" class="btn btn-secondary">✏️ Modifier mes adresses</a>
+      </div>
+    </div>
+
+    <!-- Historique des alertes -->
+    <div class="card">
+      <h2>📬 Dernières alertes reçues</h2>
+      <div id="historique-list">
+        <p style="color:#888;font-size:14px">Chargement...</p>
+      </div>
+    </div>
+
+    <!-- Paramètres -->
+    <div class="card">
+      <h2>⚙️ Paramètres</h2>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0">
+          <div>
+            <div style="font-size:14px;font-weight:500">Email de surveillance</div>
+            <div id="user-email" style="font-size:13px;color:#888"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0">
+          <div>
+            <div style="font-size:14px;font-weight:500">Rappels J-7</div>
+            <div style="font-size:13px;color:#888">Email d'urgence 7 jours avant la fin du délai</div>
+          </div>
+          <span style="color:#1a7a4a;font-size:13px">✅ Actif</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+          <div>
+            <div style="font-size:14px;font-weight:500">Rapport mensuel</div>
+            <div style="font-size:13px;color:#888">Bilan mensuel de votre surveillance</div>
+          </div>
+          <span style="color:#1a7a4a;font-size:13px">✅ Actif</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Désinscription -->
+    <div class="card">
+      <h2>🚪 Quitter PhémeApp</h2>
+      <p style="font-size:14px;color:#666;margin-bottom:16px;line-height:1.6">
+        Pour arrêter définitivement votre surveillance et supprimer vos données, cliquez sur le bouton ci-dessous.
+      </p>
+      <div class="actions">
+        <a id="unsub-link" href="#" class="btn btn-danger">Arrêter ma surveillance</a>
+        <a href="mailto:alerte@phemeapp.ch?subject=Question%20sur%20mon%20compte" class="btn btn-secondary">Une question ?</a>
+      </div>
+    </div>
+
+  </div><!-- fin #main -->
+
+  <div class="footer-page">
+    <p>PhémeApp — service d'information automatisé sur les mises à l'enquête vaudoises.<br>
+    Il ne remplace pas une consultation juridique.<br>
+    <a href="mailto:alerte@phemeapp.ch">alerte@phemeapp.ch</a></p>
+  </div>
+
+</div><!-- fin .container -->
+
+<script>
+// ─────────────────────────────────────────────
+// Lecture du token et de l'email depuis l'URL
+// ─────────────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const token  = params.get('token');
+const email  = params.get('email');
+
+// URL du Apps Script Web App (à remplacer après déploiement)
+// Laisser vide pour le mode démo
+const WEBAPP_URL = '';
+
+function showError() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error').style.display   = 'block';
+}
+
+function showMain(data) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main').style.display    = 'block';
+
+  // Email
+  document.getElementById('user-email').textContent = email || 'Non disponible';
+
+  // Adresses
+  const adressesList = document.getElementById('adresses-list');
+  if (data.adresses && data.adresses.length > 0) {
+    adressesList.innerHTML = data.adresses.map(a => `
+      <div class="adresse-row">
+        <div class="adresse-dot"></div>
+        <div class="adresse-label">${a.label || 'Adresse'}</div>
+        <div class="adresse-text">${a.adresse}</div>
+      </div>
+    `).join('');
+  } else {
+    adressesList.innerHTML = '<p style="color:#888;font-size:14px">Aucune adresse enregistrée.</p>';
+  }
+
+  // Historique
+  const histList = document.getElementById('historique-list');
+  if (data.historique && data.historique.length > 0) {
+    histList.innerHTML = data.historique.slice(0,5).map(h => `
+      <div class="historique-row">
+        <span class="historique-dist">${h.distance_m}m</span>
+        <span class="historique-commune">${h.commune} — ${h.nature_travaux ? h.nature_travaux.substring(0,50) : '--'}</span>
+        <div class="historique-date">Publié le ${h.date_fao} · Alerte envoyée le ${h.date_envoi ? h.date_envoi.substring(0,10) : '--'}</div>
+      </div>
+    `).join('');
+  } else {
+    histList.innerHTML = '<p style="color:#888;font-size:14px">Aucune alerte envoyée pour le moment. Votre surveillance est active.</p>';
+  }
+
+  // Lien désinscription
+  const unsubLink = document.getElementById('unsub-link');
+  if (data.unsub_url) {
+    unsubLink.href = data.unsub_url;
+  } else {
+    const subject = encodeURIComponent('Désinscription PhémeApp');
+    unsubLink.href = `mailto:alerte@phemeapp.ch?subject=${subject}`;
+  }
+}
+
+// ─────────────────────────────────────────────
+// Chargement des données
+// ─────────────────────────────────────────────
+async function loadUserData() {
+  if (!token || !email) {
+    showError();
+    return;
+  }
+
+  // Mode démo (sans Apps Script configuré)
+  if (!WEBAPP_URL) {
+    // Afficher avec des données fictives pour la démo
+    showMain({
+      adresses: [
+        { label: 'Maison', adresse: 'Chemin du Grebe 12, 1028 Préverenges' },
+        { label: 'Bureau', adresse: 'Route d\'Adversan 15, 1832 Villard-sur-Chamby' }
+      ],
+      historique: [
+        { distance_m: 270, commune: 'Préverenges', nature_travaux: 'Construction d\'une villa individuelle', date_fao: '05.06.2026', date_envoi: '2026-06-05' },
+        { distance_m: 312, commune: 'Préverenges', nature_travaux: 'Rénovation d\'un immeuble locatif', date_fao: '28.05.2026', date_envoi: '2026-05-28' }
+      ],
+      unsub_url: `mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp`
+    });
+    return;
+  }
+
+  // Appel réel à Apps Script Web App
+  try {
+    const resp = await fetch(`${WEBAPP_URL}?action=getUser&token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.error || !data.valid) {
+      showError();
+      return;
+    }
+    showMain(data);
+  } catch (e) {
+    console.error('Erreur chargement:', e);
+    // En cas d'erreur réseau, afficher quand même la page avec données limitées
+    showMain({
+      adresses: [],
+      historique: [],
+      unsub_url: null
+    });
+  }
+}
+
+loadUserData();
+</script>
+</body>
+</html>

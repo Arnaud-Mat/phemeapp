@@ -453,6 +453,10 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
     # BUG-007 fix: lien vers site communal si disponible, sinon FAO Vaud
     commune_url = find_commune_enquetes_url(commune.upper()) if commune and commune != "—" else None
     lien        = commune_url if commune_url else FAO_BASE_URL
+    # IDEA-P15: lien cadastre vaudois (geo.vd.ch)
+    lat_enq = enquete.get("lat", "")
+    lng_enq = enquete.get("lng", "")
+    cadastre_url = f"https://www.geo.vd.ch/?map_x={lng_enq}&map_y={lat_enq}&map_zoom=10" if lat_enq and lng_enq else ""
     prenom      = dest_nom.split()[0] if dest_nom else "bonjour"
     dist        = round(distance_m)
 
@@ -527,7 +531,10 @@ def save_communes_cache(cache):
         json.dump(cache, f, indent=2, ensure_ascii=False)
 
 def get_commune_from_coords(lat, lng):
-    """Trouve le nom de la commune depuis des coordonnees GPS via Nominatim."""
+    """Trouve le nom de la commune depuis des coordonnees GPS via Nominatim.
+    IDEA-T09: délai 1s entre appels pour respecter les CGU Nominatim."""
+    import time as _time
+    _time.sleep(1)  # max 1 req/sec
     try:
         r = requests.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -1249,7 +1256,7 @@ def run():
         send_monthly_confirmation(user, notified)
 
     log(f"Récupération des mises à l'enquête ({SEARCH_DAYS}j)...")
-    enquetes = fetch_enquetes()
+    enquetes = fetch_enquetes_with_retry()
 
     if not enquetes:
         log("Aucune mise à l'enquête récupérée — fin.")

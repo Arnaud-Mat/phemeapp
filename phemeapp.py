@@ -347,6 +347,38 @@ def save_notified(notified):
 def already_notified(notified, email, no_camac):
     return f"{email}:{no_camac}" in notified
 
+def already_notified_similar(notified, email, enquete, threshold_days=60):
+    """
+    IDEA-T13: Déduplication intelligente.
+    Vérifie si une alerte similaire (même lieu + commune) a été envoyée
+    dans les X derniers jours — pour éviter les doublons sur prolongations.
+    """
+    lieu    = (enquete.get("lieu") or "").strip().lower()[:30]
+    commune = (enquete.get("commune") or "").strip().lower()[:20]
+    if not lieu or not commune:
+        return False
+    cutoff = (datetime.now() - timedelta(days=threshold_days)).isoformat()
+    for key, val in notified.items():
+        if not key.startswith(f"{email}:"):
+            continue
+        if not isinstance(val, str) or val < cutoff:
+            continue
+        # Chercher le contexte stocké avec la clé
+        context_key = key + ":ctx"
+        ctx = notified.get(context_key, "")
+        if lieu in ctx and commune in ctx:
+            log(f"  Doublon détecté: {lieu}, {commune} déjà alerté récemment", "warning")
+            return True
+    return False
+
+def mark_notified_with_context(notified, email, no_camac, enquete):
+    """Marque comme notifié en stockant le contexte pour la déduplication."""
+    notified[f"{email}:{no_camac}"] = datetime.now().isoformat()
+    lieu    = (enquete.get("lieu") or "").strip().lower()[:30]
+    commune = (enquete.get("commune") or "").strip().lower()[:20]
+    if lieu and commune:
+        notified[f"{email}:{no_camac}:ctx"] = f"{lieu}|{commune}"
+
 def mark_notified(notified, email, no_camac):
     notified[f"{email}:{no_camac}"] = datetime.now().isoformat()
 
@@ -955,6 +987,7 @@ def send_monthly_confirmation(user, notified):
         "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>"
         "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. "
         f"&nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+        f"{get_tracking_pixel(dest_email, no_camac)}"
         "</div></body></html>"
     )
 
@@ -1043,6 +1076,80 @@ def send_rappel_j7(user, notified, enquetes):
                 log(f"  Rappel J-7 envoyé -> {email} (CAMAC {no_camac}, J-{jours_restants})")
             except Exception as e:
                 log(f"  Erreur rappel J-7 {email}: {e}", "error")
+
+
+def send_zone_elargie_newsletter(user, notified):
+    """
+    IDEA-P02: Newsletter mensuelle dédiée à la zone élargie (500m–2km).
+    Complémentaire du rapport mensuel — focus sur l'activité du quartier.
+    Max 1x/mois, envoyée seulement si au moins 1 publication en zone élargie.
+    """
+    email = user["email"]
+    mois  = datetime.now().strftime("%Y-%m")
+    key   = f"newsletter_zone:{email}:{mois}"
+    if key in notified:
+        return
+
+    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+    zone_mois = load_zone_elargie_from_sheet(email, mois)
+
+    if not zone_mois:
+        return  # Rien en zone élargie ce mois — pas d'email
+
+    nb = len(zone_mois)
+    mois_label = datetime.now().strftime("%B %Y")
+    unsub_lien = get_unsub_link(email)
+    magic_lien = get_magic_link(email)
+
+    rows_html = ""
+    for z in zone_mois[:10]:
+        dist = z.get("distance_m", "?")
+        commune = z.get("commune", "--")
+        nature = (z.get("nature_travaux") or "--")[:60]
+        date_fao = z.get("date_fao", "--")
+        lien = z.get("lien", FAO_BASE_URL)
+        col = "#f59e0b" if int(str(dist).replace("m","") or 2000) <= 1000 else "#888"
+        rows_html += (
+            f"<tr style='border-bottom:1px solid #eee'>"
+            f"<td style='padding:8px;color:{col};font-weight:bold'>{dist}m</td>"
+            f"<td style='padding:8px'>{commune}</td>"
+            f"<td style='padding:8px;font-size:12px;color:#666'>{nature}</td>"
+            f"<td style='padding:8px;font-size:12px'>{date_fao}</td>"
+            f"<td style='padding:8px;font-size:12px'><a href='{lien}' style='color:#1a3a5c'>Voir →</a></td>"
+            f"</tr>"
+        )
+
+    html = (
+        "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"
+        "<div style='background:#1a3a5c;padding:18px 24px'>"
+        "<h1 style='color:white;margin:0;font-size:20px'>PhémeApp</h1>"
+        f"<p style='color:#a8c4e0;margin:4px 0 0;font-size:12px'>Activité du quartier — {mois_label}</p>"
+        "</div><div style='padding:24px'>"
+        f"<p style='font-size:16px'>Bonjour {prenom},</p>"
+        f"<p style='font-size:14px;color:#444;line-height:1.7'>Ce mois, <strong>{nb} mise{'s' if nb > 1 else ''} à l'enquête</strong> ont été publiées dans un rayon de <strong>500m à 2km</strong> autour de vos adresses. Aucune n'était assez proche pour déclencher une alerte directe, mais voici l'activité de votre quartier.</p>"
+        "<div style='background:#fff8e1;border-left:3px solid #f59e0b;padding:12px 16px;margin:16px 0;border-radius:0 6px 6px 0'>"
+        "<strong style='color:#92400e;font-size:13px'>Ces projets ne concernent pas directement votre périmètre de 500m.</strong>"
+        "</div>"
+        "<table style='width:100%;border-collapse:collapse;font-size:13px;margin:16px 0'>"
+        "<tr style='background:#f0f4f8'>"
+        "<th style='padding:8px;text-align:left'>Distance</th>"
+        "<th style='padding:8px;text-align:left'>Commune</th>"
+        "<th style='padding:8px;text-align:left'>Nature</th>"
+        "<th style='padding:8px;text-align:left'>FAO</th>"
+        "<th style='padding:8px;text-align:left'>Lien</th></tr>"
+        + rows_html + "</table>"
+        f"<p style='font-size:13px;color:#888;margin-top:16px'><a href='{magic_lien}' style='color:#1a3a5c;font-weight:500'>Mon espace PhémeApp →</a></p>"
+        "<p style='font-size:14px;color:#444;margin-top:20px'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
+        f"<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+        "</div></body></html>"
+    )
+
+    try:
+        smtp_send(email, f"PhémeApp — Activité de votre quartier en {mois_label}", html)
+        notified[key] = datetime.now().isoformat()
+        log(f"  Newsletter zone élargie envoyée -> {email} ({nb} publications)")
+    except Exception as e:
+        log(f"  Erreur newsletter zone {email}: {e}", "error")
 
 
 def send_weekly_summary(user, notified, enquetes):
@@ -1161,6 +1268,21 @@ def handle_unsubscribe_in_sheet(email):
 MAGIC_LINK_BASE = os.environ.get("MAGIC_LINK_BASE", "https://phemeapp.ch/mon-compte")
 MAGIC_LINK_SECRET = os.environ.get("MAGIC_LINK_SECRET", "phemeapp-magic-2026")
 
+def get_tracking_pixel(email, no_camac):
+    """
+    IDEA-P14: Pixel de tracking 1x1 transparent.
+    Si APPS_SCRIPT_WEBAPP_URL configuré → Apps Script log l'ouverture.
+    Sinon → pixel transparent générique (ne log rien).
+    """
+    if APPS_SCRIPT_WEBAPP_URL:
+        from urllib.parse import quote as _q
+        token = generate_unsub_token(email)
+        return (f'<img src="{APPS_SCRIPT_WEBAPP_URL}'
+                f'?action=track&email={_q(email)}&camac={no_camac}&token={token}" '
+                f'width="1" height="1" style="display:none" alt="">')
+    return '<img src="https://phemeapp.ch/pixel.gif" width="1" height="1" style="display:none" alt="">'
+
+
 def generate_magic_token(email):
     """
     IDEA-U01: Token magic link valide 30 jours.
@@ -1250,6 +1372,10 @@ def run():
     log("Géocodage des adresses...")
     users = geocode_users(users)
 
+    # IDEA-P02: newsletter zone élargie
+    for user in users:
+        send_zone_elargie_newsletter(user, notified)
+
     # IDEA-P03: rapport mensuel AVANT fetch (basé sur historique Sheet, indépendant API CAMAC)
     log("Rapports mensuels depuis historique Sheet...")
     for user in users:
@@ -1277,11 +1403,14 @@ def run():
                 no_camac = enquete.get("noCamac")
                 if already_notified(notified, user["email"], no_camac):
                     continue
+                # IDEA-T13: vérifier les doublons par similarité (prolongations)
+                if already_notified_similar(notified, user["email"], enquete):
+                    continue
                 dist = haversine_m(adr["lat"], adr["lng"], enquete["lat"], enquete["lng"])
                 if dist <= PERIMETER_M:
                     log(f"  MATCH! CAMAC {no_camac} à {round(dist)}m de '{adr['label']}' ({user['email']})")
                     if send_email(user["email"], user["nom"], enquete, adr, dist):
-                        mark_notified(notified, user["email"], no_camac)
+                        mark_notified_with_context(notified, user["email"], no_camac, enquete)
                         log_alerte_historique(user, adr, enquete, dist)
                         total += 1
                 elif PERIMETER_M < dist <= PERIMETER_LARGE_M:

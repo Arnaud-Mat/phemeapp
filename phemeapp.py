@@ -1,5 +1,5 @@
 """
-PhémeApp — MVP v1.2
+PhémeApp — v2.1
 ====================
 Script quotidien de détection des mises à l'enquête vaudoises.
 
@@ -1167,6 +1167,84 @@ def send_zone_elargie_newsletter(user, notified):
         log(f"  Erreur newsletter zone {email}: {e}", "error")
 
 
+def send_annual_summary(user, notified):
+    """
+    IDEA-P20: Email bilan annuel envoyé en janvier.
+    Récapitulatif de l'année écoulée: alertes reçues, communes actives, etc.
+    """
+    # Seulement en janvier
+    if datetime.now().month != 1:
+        return
+
+    email = user["email"]
+    annee = datetime.now().year - 1  # Bilan de l'année précédente
+    key   = f"annual:{email}:{annee}"
+    if key in notified:
+        return
+
+    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+
+    # Lire l'historique depuis le Sheet pour l'année écoulée
+    try:
+        from urllib.parse import quote as _q
+        url = (f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
+               f"/gviz/tq?tqx=out:csv&sheet={_q(SHEET_HISTORIQUE)}")
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+        import csv as _csv, io as _io
+        rows = list(_csv.reader(_io.StringIO(resp.text)))[1:]
+        alertes_annee = [r for r in rows
+                         if len(r) > 1 and r[1].strip().lower() == email.lower()
+                         and str(annee) in r[0]]
+    except:
+        alertes_annee = []
+
+    nb_alertes = len(alertes_annee)
+    communes_vues = {}
+    for row in alertes_annee:
+        c = row[7] if len(row) > 7 else "?"
+        communes_vues[c] = communes_vues.get(c, 0) + 1
+    top_commune = max(communes_vues, key=communes_vues.get) if communes_vues else None
+
+    unsub_lien = get_unsub_link(email)
+    magic_lien = get_magic_link(email)
+
+    if nb_alertes == 0:
+        msg_bilan = "Aucune mise à l'enquête n'a été détectée dans votre périmètre cette année. Votre surveillance est restée active tout au long de l'année."
+        couleur = "#1a7a4a"
+        emoji = "✅"
+    else:
+        msg_bilan = f"Cette année, <strong>{nb_alertes} mise{'s' if nb_alertes > 1 else ''} à l'enquête</strong> ont été détectées dans votre périmètre de surveillance."
+        couleur = "#dc2626" if nb_alertes > 3 else "#f59e0b"
+        emoji = "⚠️" if nb_alertes > 3 else "📬"
+
+    html = (
+        "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"
+        "<div style='background:#1a3a5c;padding:18px 24px'>"
+        "<h1 style='color:white;margin:0;font-size:20px'>PhémeApp</h1>"
+        f"<p style='color:#a8c4e0;margin:4px 0 0;font-size:12px'>Bilan annuel {annee}</p>"
+        "</div><div style='padding:24px'>"
+        f"<p style='font-size:16px'>Bonjour {prenom},</p>"
+        f"<p style='font-size:14px;color:#444;line-height:1.7'>Voici le bilan de votre surveillance PhémeApp pour l'année <strong>{annee}</strong>.</p>"
+        f"<div style='background:#f0fdf4;border-left:3px solid {couleur};padding:16px 18px;margin:16px 0;border-radius:0 6px 6px 0'>"
+        f"<p style='margin:0;font-size:14px;color:#0f4a2a'>{emoji} {msg_bilan}</p>"
+        + (f"<p style='margin:8px 0 0;font-size:13px;color:#555'>Commune la plus active dans votre périmètre : <strong>{top_commune}</strong></p>" if top_commune else "")
+        + "</div>"
+        "<p style='font-size:14px;color:#444;line-height:1.7'>Merci de faire confiance à PhémeApp pour surveiller votre environnement. Votre surveillance continue en {annee+1}.</p>"
+        f"<p style='font-size:13px;color:#888;margin-top:16px'><a href='{magic_lien}' style='color:#1a3a5c;font-weight:500'>Mon espace PhémeApp →</a></p>"
+        "<p style='font-size:14px;color:#444;margin-top:20px'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
+        f"<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+        "</div></body></html>"
+    )
+
+    try:
+        smtp_send(email, f"PhémeApp — Votre bilan {annee}", html)
+        notified[key] = datetime.now().isoformat()
+        log(f"  Bilan annuel {annee} envoyé -> {email} ({nb_alertes} alertes)")
+    except Exception as e:
+        log(f"  Erreur bilan annuel {email}: {e}", "error")
+
+
 def send_weekly_summary(user, notified, enquetes):
     """
     IDEA-P12: Email chaque lundi si aucune alerte cette semaine.
@@ -1407,6 +1485,32 @@ def generate_admin_dashboard(notified, users, enquetes):
         log(f"Erreur génération dashboard: {e}", "error")
 
 
+def purge_old_notified(notified, max_days=90):
+    """
+    IDEA-T16: Supprime les entrées de plus de max_days jours dans notified.
+    Garde toutes les clés welcome: et monthly: (pas de date limite).
+    Réduit la taille du fichier au fil du temps.
+    """
+    cutoff = (datetime.now() - timedelta(days=max_days)).isoformat()
+    keys_before = len(notified)
+    to_delete = []
+    for key, val in notified.items():
+        # Garder les clés permanentes
+        if key.startswith("welcome:") or key.startswith("monthly:") or key.startswith("newsletter_zone:"):
+            continue
+        # Supprimer les entrées trop anciennes
+        if isinstance(val, str) and val < cutoff and not key.endswith(":ctx"):
+            to_delete.append(key)
+            # Supprimer aussi le contexte associé
+            to_delete.append(key + ":ctx")
+    for key in to_delete:
+        notified.pop(key, None)
+    purged = keys_before - len(notified)
+    if purged > 0:
+        log(f"notified.json: {purged} entrées purgées (>{max_days}j), {len(notified)} restantes")
+    return notified
+
+
 def ping_healthcheck(fail=False):
     """IDEA-T05: Ping healthcheck.io pour monitorer le cron."""
     if not HEALTHCHECK_URL:
@@ -1437,7 +1541,7 @@ def send_admin_alert(subject, body):
 
 def run():
     log("=" * 50)
-    log("PhémeApp — démarrage")
+    log(f"PhémeApp v2.1 — démarrage")
     log("=" * 50)
 
     users    = load_users_from_sheet()
@@ -1461,6 +1565,9 @@ def run():
     # IDEA-P02: newsletter zone élargie
     for user in users:
         send_zone_elargie_newsletter(user, notified)
+    # IDEA-P20: bilan annuel (janvier)
+    for user in users:
+        send_annual_summary(user, notified)
 
     # IDEA-P03: rapport mensuel AVANT fetch (basé sur historique Sheet, indépendant API CAMAC)
     log("Rapports mensuels depuis historique Sheet...")
@@ -1504,6 +1611,9 @@ def run():
                     if zone_key not in notified:
                         log_zone_elargie(user, adr, enquete, dist)
                         notified[zone_key] = datetime.now().isoformat()
+
+    # IDEA-T16: purger les vieilles entrées notified
+    notified = purge_old_notified(notified)
 
     # IDEA-T14: dashboard admin
     generate_admin_dashboard(notified, users, enquetes)

@@ -1030,17 +1030,24 @@ def run():
 
 
 if __name__ == "__main__":
+    import traceback as _tb, sys as _sys
     try:
         run()
-        ping_healthcheck()  # succes
-    except Exception as e:
-        import traceback
-        err = traceback.format_exc()
-        log(f"ERREUR CRITIQUE: {e}")
-        log(err)
-        ping_healthcheck("fail")
-        send_admin_alert(f"Erreur critique: {e}", err)
-        raise
+        ping_healthcheck()
+    except Exception as _e:
+        _err = _tb.format_exc()
+        print("=" * 60, flush=True)
+        print(f"ERREUR CRITIQUE: {_e}", flush=True)
+        print(_err, flush=True)
+        print("=" * 60, flush=True)
+        try:
+            log(f"ERREUR CRITIQUE: {_e}")
+            log(_err)
+            ping_healthcheck("fail")
+            send_admin_alert(f"Erreur critique: {_e}", _err)
+        except Exception as _e2:
+            print(f"Impossible d envoyer admin alert: {_e2}", flush=True)
+        _sys.exit(1)
 
 
 # ─────────────────────────────────────────────

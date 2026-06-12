@@ -1321,6 +1321,77 @@ def verify_magic_token(email, token):
     return False
 
 
+def generate_admin_dashboard(notified, users, enquetes):
+    """
+    IDEA-T14: Génère une page HTML de dashboard admin.
+    Stockée dans logs/dashboard.html — disponible dans GitHub Actions Artifacts.
+    Stats: nb utilisateurs, alertes envoyées, communes actives, etc.
+    """
+    try:
+        nb_users    = len(users)
+        nb_alertes  = sum(1 for k in notified if ":" in k and not k.startswith("monthly:") and not k.startswith("weekly:") and not k.startswith("rappel7:") and not k.startswith("newsletter_zone:") and not k.endswith(":ctx") and "welcome:" not in k)
+        nb_enquetes = len(enquetes)
+        communes    = {}
+        for e in enquetes:
+            c = e.get("commune", "?")
+            communes[c] = communes.get(c, 0) + 1
+        top_communes = sorted(communes.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        communes_rows = "".join(
+            f"<tr><td style='padding:8px'>{c}</td><td style='padding:8px;text-align:right;font-weight:bold'>{n}</td></tr>"
+            for c, n in top_communes
+        )
+
+        users_rows = "".join(
+            f"<tr><td style='padding:8px;font-size:13px'>{u['email']}</td>"
+            f"<td style='padding:8px;font-size:13px'>{u['nom']}</td>"
+            f"<td style='padding:8px;font-size:13px'>{len(u['adresses'])} adresse(s)</td></tr>"
+            for u in users
+        )
+
+        html = f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>PhémeApp — Dashboard Admin</title>
+<style>
+  body {{ font-family: Arial, sans-serif; background: #f0f4f8; color: #333; padding: 24px; }}
+  h1 {{ color: #1a3a5c; }} h2 {{ color: #1a3a5c; font-size: 16px; margin: 24px 0 12px; }}
+  .grid {{ display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0; }}
+  .stat {{ background: white; border-radius: 8px; padding: 20px 24px; min-width: 140px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }}
+  .stat-value {{ font-size: 36px; font-weight: bold; color: #1a3a5c; }}
+  .stat-label {{ font-size: 13px; color: #888; margin-top: 4px; }}
+  table {{ width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }}
+  th {{ background: #1a3a5c; color: white; padding: 10px 8px; text-align: left; font-size: 13px; }}
+  tr:nth-child(even) {{ background: #f9f9f9; }}
+  .footer {{ font-size: 11px; color: #aaa; margin-top: 32px; }}
+</style>
+</head>
+<body>
+<h1>PhémeApp — Dashboard Admin</h1>
+<p style="color:#888;font-size:13px">Généré le {datetime.now().strftime('%d.%m.%Y à %H:%M')} — Run automatique GitHub Actions</p>
+<div class="grid">
+  <div class="stat"><div class="stat-value">{nb_users}</div><div class="stat-label">Utilisateurs actifs</div></div>
+  <div class="stat"><div class="stat-value">{nb_alertes}</div><div class="stat-label">Alertes envoyées (total)</div></div>
+  <div class="stat"><div class="stat-value">{nb_enquetes}</div><div class="stat-label">Publications CAMAC (30j)</div></div>
+  <div class="stat"><div class="stat-value">{len(communes)}</div><div class="stat-label">Communes actives</div></div>
+</div>
+<h2>Top communes (30 derniers jours)</h2>
+<table><tr><th>Commune</th><th style="text-align:right">Publications</th></tr>{communes_rows}</table>
+<h2>Utilisateurs</h2>
+<table><tr><th>Email</th><th>Nom</th><th>Adresses</th></tr>{users_rows}</table>
+<div class="footer">PhémeApp — Confidentiel. Ne pas partager.</div>
+</body></html>"""
+
+        Path("logs").mkdir(exist_ok=True)
+        with open("logs/dashboard.html", "w", encoding="utf-8") as f:
+            f.write(html)
+        log("Dashboard admin généré: logs/dashboard.html")
+
+    except Exception as e:
+        log(f"Erreur génération dashboard: {e}", "error")
+
+
 def ping_healthcheck(fail=False):
     """IDEA-T05: Ping healthcheck.io pour monitorer le cron."""
     if not HEALTHCHECK_URL:
@@ -1418,6 +1489,9 @@ def run():
                     if zone_key not in notified:
                         log_zone_elargie(user, adr, enquete, dist)
                         notified[zone_key] = datetime.now().isoformat()
+
+    # IDEA-T14: dashboard admin
+    generate_admin_dashboard(notified, users, enquetes)
 
     save_notified(notified)
     log("=" * 50)

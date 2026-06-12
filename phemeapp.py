@@ -757,7 +757,17 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+        ping_healthcheck()  # succes
+    except Exception as e:
+        import traceback
+        err = traceback.format_exc()
+        log(f"ERREUR CRITIQUE: {e}")
+        log(err)
+        ping_healthcheck("fail")
+        send_admin_alert(f"Erreur critique: {e}", err)
+        raise
 
 
 # ─────────────────────────────────────────────

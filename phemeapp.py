@@ -250,6 +250,21 @@ def fetch_enquetes(days=SEARCH_DAYS):
 # 4. DISTANCE HAVERSINE
 # ─────────────────────────────────────────────
 
+
+def fetch_enquetes_with_retry(days=SEARCH_DAYS, max_retries=2, delay=30):
+    """IDEA-T10: Retry automatique si API CAMAC down."""
+    import time as _time
+    for attempt in range(max_retries + 1):
+        result = fetch_enquetes(days)
+        if result:
+            return result
+        if attempt < max_retries:
+            log(f"API CAMAC vide — retry {attempt+1}/{max_retries} dans {delay}s...", "warning")
+            _time.sleep(delay)
+    log("API CAMAC indisponible après retries — abandon", "error")
+    return []
+
+
 def haversine_m(lat1, lng1, lat2, lng2):
     R = 6371000
     phi1, phi2 = math.radians(lat1), math.radians(lat2)

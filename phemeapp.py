@@ -1001,6 +1001,7 @@ def send_rappel_j7(user, notified, enquetes):
             date_fao = format_date(ts_ms)
             commune_url = find_commune_enquetes_url(commune.upper()) if commune else None
             lien     = commune_url if commune_url else FAO_BASE_URL
+            unsub_lien = get_unsub_link(email)
 
             html = (
                 "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"

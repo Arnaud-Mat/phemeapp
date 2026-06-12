@@ -430,7 +430,7 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
 
         <div style="background:#fff8e1;border-left:4px solid #f59e0b;padding:14px 18px;margin:20px 0;border-radius:4px;">
           <strong style="color:{color_alerte}">{prefix_alerte}{jours_txt} pour faire opposition</strong><br>
-          <span style="font-size:13px;color:{'#991b1b' if urgence else '#92400e'}">Date FAO : <strong>{date_fao}</strong> — d&eacute;lai l&eacute;gal de 30 jours.</span>
+          <span style="font-size:13px;color:{color_alerte}">Date FAO : <strong>{date_fao}</strong> — d&eacute;lai l&eacute;gal de 30 jours.</span>
         </div>
 
         <table style="width:100%;border-collapse:collapse;margin:20px 0;">

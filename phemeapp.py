@@ -33,6 +33,7 @@ from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
+from urllib.parse import quote as url_quote
 
 # ─────────────────────────────────────────────
 # CONFIGURATION
@@ -106,7 +107,7 @@ def log(msg):
 def load_users_from_sheet():
     url = (
         f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
-        f"/gviz/tq?tqx=out:csv&sheet={requests.utils.quote(SHEET_TAB)}"
+        f"/gviz/tq?tqx=out:csv&sheet={url_quote(SHEET_TAB)}"
     )
     try:
         r = requests.get(url, timeout=15)
@@ -739,7 +740,7 @@ def load_historique_from_sheet(email, mois):
     try:
         url = (
             f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
-            f"/gviz/tq?tqx=out:csv&sheet={requests.utils.quote(SHEET_HISTORIQUE)}"
+            f"/gviz/tq?tqx=out:csv&sheet={url_quote(SHEET_HISTORIQUE)}"
         )
         r = requests.get(url, timeout=15)
         r.raise_for_status()
@@ -785,7 +786,7 @@ def load_zone_elargie_from_sheet(email, mois):
     try:
         url = (
             f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
-            f"/gviz/tq?tqx=out:csv&sheet={requests.utils.quote(SHEET_ZONE)}"
+            f"/gviz/tq?tqx=out:csv&sheet={url_quote(SHEET_ZONE)}"
         )
         r = requests.get(url, timeout=15)
         r.raise_for_status()

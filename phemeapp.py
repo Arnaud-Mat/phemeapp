@@ -486,7 +486,7 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
         </div>
 
         <p style="font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;">
-          PhémeApp est un service d'information automatisé. Il ne remplace pas un avis juridique. &nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a>
+          PhémeApp est un service d'information automatisé. Il ne remplace pas un avis juridique. &nbsp;&nbsp;<a href='{magic_lien}' style='color:#1a3a5c;font-size:10px;font-weight:500'>Mon espace →</a> &nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a>
         </p>
       </div>
     </body></html>"""

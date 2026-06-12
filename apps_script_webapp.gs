@@ -179,3 +179,135 @@ function testDoPost() {
   var result = doPost(fakeE);
   Logger.log(result.getContent());
 }
+
+// ─────────────────────────────────────────────
+// D) ESPACE UTILISATEUR - doGet (lecture données)
+// ─────────────────────────────────────────────
+function doGet(e) {
+  var action = e.parameter.action || "";
+  var email  = e.parameter.email  || "";
+  var token  = e.parameter.token  || "";
+
+  // Vérifier le token (même logique que Python)
+  if (!verifyMagicToken(email, token)) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: "Token invalide", valid: false}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === "getUser") {
+    return getUserData(email, token);
+  } else if (action === "unsubscribe") {
+    return handleUnsubscribe(email, token);
+  }
+
+  return ContentService
+    .createTextOutput(JSON.stringify({error: "Action inconnue"}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function verifyMagicToken(email, token) {
+  // Vérifier pour le mois courant et le mois précédent
+  var secret = "phemeapp-magic-2026";
+  var now = new Date();
+
+  for (var delta = 0; delta <= 1; delta++) {
+    var d = new Date(now);
+    d.setMonth(d.getMonth() - delta);
+    var mois = Utilities.formatDate(d, "UTC", "yyyy-MM");
+    var raw = email + ":" + mois + ":" + secret;
+    var expected = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      raw,
+      Utilities.Charset.UTF_8
+    ).map(function(b) {
+      return ("0" + (b & 0xFF).toString(16)).slice(-2);
+    }).join("").substring(0, 32);
+
+    if (token === expected) return true;
+  }
+  return false;
+}
+
+function getUserData(email, token) {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+
+  // Lire les adresses depuis Form Responses
+  var formSheet = ss.getSheetByName("Form Responses 1");
+  var adresses = [];
+  if (formSheet) {
+    var rows = formSheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i][2] && rows[i][2].toString().toLowerCase() === email.toLowerCase()) {
+        var adr1 = rows[i][3] || "";
+        var lab1 = rows[i][4] || "Adresse 1";
+        var adr2 = rows[i][5] || "";
+        var lab2 = rows[i][6] || "Adresse 2";
+        if (adr1) adresses.push({label: lab1, adresse: adr1});
+        if (adr2) adresses.push({label: lab2, adresse: adr2});
+        break;
+      }
+    }
+  }
+
+  // Lire l historique des alertes
+  var histSheet = ss.getSheetByName("Historique Alertes");
+  var historique = [];
+  if (histSheet) {
+    var histRows = histSheet.getDataRange().getValues();
+    for (var j = 1; j < histRows.length; j++) {
+      if (histRows[j][1] && histRows[j][1].toString().toLowerCase() === email.toLowerCase()) {
+        historique.push({
+          date_envoi:    histRows[j][0] ? histRows[j][0].toString().substring(0, 10) : "",
+          commune:       histRows[j][7] || "--",
+          nature_travaux:histRows[j][8] || "--",
+          distance_m:    histRows[j][9] || 0,
+          date_fao:      histRows[j][10] || "--",
+          lien:          histRows[j][11] || ""
+        });
+      }
+    }
+    historique.reverse(); // Plus récent en premier
+    historique = historique.slice(0, 10);
+  }
+
+  // Générer le lien désinscription
+  var unsubToken = verifyMagicToken(email, token) ? token : "";
+  var unsub_url = "mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp";
+
+  var result = {
+    valid: true,
+    email: email,
+    adresses: adresses,
+    historique: historique,
+    unsub_url: unsub_url
+  };
+
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleUnsubscribe(email, token) {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName("Form Responses 1");
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({error: "Sheet non trouvé"}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var rows = sheet.getDataRange().getValues();
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (rows[i][2] && rows[i][2].toString().toLowerCase() === email.toLowerCase()) {
+      sheet.deleteRow(i + 1);
+      Logger.log("Désinscription: " + email + " supprimé ligne " + (i + 1));
+      return ContentService
+        .createTextOutput(JSON.stringify({success: true, message: "Désinscription effectuée"}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  return ContentService
+    .createTextOutput(JSON.stringify({error: "Email non trouvé"}))
+    .setMimeType(ContentService.MimeType.JSON);
+}

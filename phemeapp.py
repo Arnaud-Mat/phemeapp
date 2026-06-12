@@ -899,10 +899,13 @@ def run():
                         log_zone_elargie(user, adr, enquete, dist)
                         notified[zone_key] = datetime.now().isoformat()
 
-    # IDEA-P03: rapport mensuel
-    log("Rapports mensuels...")
-    for user in users:
-        send_monthly_confirmation(user, notified, enquetes)
+    # IDEA-P03: rapport mensuel (seulement si l API a retourne des resultats)
+    if enquetes:
+        log("Rapports mensuels...")
+        for user in users:
+            send_monthly_confirmation(user, notified, enquetes)
+    else:
+        log("Rapport mensuel ignore: API CAMAC n a retourne aucune donnee")
 
     save_notified(notified)
     log("=" * 50)

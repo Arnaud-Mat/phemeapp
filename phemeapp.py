@@ -87,9 +87,30 @@ FAO_BASE_URL      = "https://www.faovd.ch/permis-de-construire/"
 
 Path(LOGS_DIR).mkdir(exist_ok=True)
 
-def log(msg):
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}] {msg}")
+import logging as _logging, sys as _sys
+
+def _setup_logger():
+    Path("logs").mkdir(exist_ok=True)
+    fmt = _logging.Formatter("[%(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    logger = _logging.getLogger("phemeapp")
+    logger.setLevel(_logging.DEBUG)
+    if not logger.handlers:
+        sh = _logging.StreamHandler(_sys.stdout)
+        sh.setFormatter(fmt)
+        logger.addHandler(sh)
+        try:
+            fh = _logging.FileHandler("logs/phemeapp.log", encoding="utf-8")
+            fh.setFormatter(fmt)
+            logger.addHandler(fh)
+        except Exception:
+            pass
+    return logger
+
+_logger = _setup_logger()
+
+def log(msg, level="info"):
+    """Logging structuré — IDEA-T08."""
+    getattr(_logger, level if level in ("debug","info","warning","error","critical") else "info")(msg)
 
 
 # ─────────────────────────────────────────────
@@ -1011,6 +1032,77 @@ def send_rappel_j7(user, notified, enquetes):
                 log(f"  Rappel J-7 envoyé -> {email} (CAMAC {no_camac}, J-{jours_restants})")
             except Exception as e:
                 log(f"  Erreur rappel J-7 {email}: {e}", "error")
+
+
+def send_weekly_summary(user, notified, enquetes):
+    """
+    IDEA-P12: Email chaque lundi si aucune alerte cette semaine.
+    Montre les stats de la semaine : X dossiers analysés, aucun dans le périmètre.
+    Ne s'envoie pas si une alerte a déjà été envoyée cette semaine.
+    """
+    # Seulement le lundi
+    if datetime.now().weekday() != 0:
+        return
+
+    email = user["email"]
+    semaine = datetime.now().strftime("%Y-W%W")
+    key_weekly = f"weekly:{email}:{semaine}"
+
+    if key_weekly in notified:
+        return
+
+    # Vérifier si une alerte a été envoyée cette semaine
+    key_prefix = f"notified:{email}:"
+    alerte_cette_semaine = any(
+        k.startswith(f"{email}:") and
+        v >= (datetime.now() - timedelta(days=7)).isoformat()
+        for k, v in notified.items()
+        if isinstance(v, str)
+    )
+    if alerte_cette_semaine:
+        return  # Déjà alerté cette semaine, pas de résumé
+
+    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+    total  = len(enquetes)
+
+    # Stats zone élargie
+    nb_zone = 0
+    for adr in user["adresses"]:
+        if not adr.get("lat"):
+            continue
+        for e in enquetes:
+            if e.get("lat") and e.get("lng"):
+                d = haversine_m(adr["lat"], adr["lng"], e["lat"], e["lng"])
+                if 500 < d <= 2000:
+                    nb_zone += 1
+
+    html = (
+        "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"
+        "<div style='background:#1a3a5c;padding:18px 24px'>"
+        "<h1 style='color:white;margin:0;font-size:20px'>PhémeApp</h1>"
+        f"<p style='color:#a8c4e0;margin:4px 0 0;font-size:12px'>Résumé de la semaine — {datetime.now().strftime('%d %B %Y')}</p>"
+        "</div><div style='padding:24px'>"
+        f"<p style='font-size:16px'>Bonjour {prenom},</p>"
+        "<div style='background:#f0fdf4;border-left:3px solid #1a7a4a;padding:14px 18px;margin:16px 0;border-radius:0 6px 6px 0'>"
+        f"<strong style='color:#0f4a2a'>✅ Aucune mise à l'enquête dans votre périmètre cette semaine</strong>"
+        "</div>"
+        f"<p style='font-size:14px;color:#444;line-height:1.7'>Cette semaine, notre système a analysé <strong>{total} publications</strong> dans le canton de Vaud."
+        + (f" <strong>{nb_zone} publication{'s' if nb_zone > 1 else ''}</strong> ont été détectées dans un rayon de 2km autour de vos adresses, mais aucune dans votre périmètre de surveillance de 500m." if nb_zone > 0 else " Aucune publication n'a été détectée dans un rayon de 2km autour de vos adresses.")
+        + "</p>"
+        "<p style='font-size:13px;color:#888;margin-top:20px'>Votre surveillance reste active. Vous recevrez une alerte dès qu'une mise à l'enquête sera publiée dans votre périmètre.</p>"
+        "<p style='font-size:14px;color:#444;margin-top:20px'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
+        "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>"
+        "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. "
+        "&nbsp;<a href='mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
+        "</div></body></html>"
+    )
+
+    try:
+        smtp_send(email, f"PhémeApp — Semaine du {datetime.now().strftime('%d %B')}: aucune alerte", html)
+        notified[key_weekly] = datetime.now().isoformat()
+        log(f"  Résumé hebdo envoyé -> {email}")
+    except Exception as e:
+        log(f"  Erreur résumé hebdo {email}: {e}", "error")
 
 
 def ping_healthcheck(fail=False):

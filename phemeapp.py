@@ -448,7 +448,7 @@ def smtp_send(dest, subject, html):
 
 
 def send_welcome_email(dest_email, dest_nom, adresses):
-    prenom = dest_nom.split()[0] if dest_nom else "bonjour"
+    prenom = esc(dest_nom.split()[0] if dest_nom else "bonjour")
     unsub_lien = get_unsub_link(dest_email)
     magic_lien = get_magic_link(dest_email)
     adresses_html = "".join([
@@ -516,7 +516,7 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m, profil=''):
     color_alerte  = "#991b1b" if urgence else "#92400e"
     prefix_alerte = "\u26a0\ufe0f URGENT \u2014 " if urgence else "\u23f1 "
     jours_txt     = f"{jours_restants} jour{'s' if jours_restants > 1 else ''}"
-    no_camac    = enquete.get("noCamac", "?")
+    no_camac    = esc(str(enquete.get("noCamac", "?")))
     unsub_lien  = get_unsub_link(dest_email)
     magic_lien   = get_magic_link(dest_email)
     lieu        = esc(enquete.get("lieu", "—"))
@@ -935,7 +935,7 @@ def send_monthly_confirmation(user, notified):
     if not user.get('notif_mensuel', True):
         return  # IDEA-U07: désactivé par l'utilisateur
 
-    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+    prenom = esc(user["nom"].split()[0] if user["nom"] else "bonjour")
     unsub_lien = get_unsub_link(email)
 
     # Lire l historique réel depuis le Sheet
@@ -956,7 +956,7 @@ def send_monthly_confirmation(user, notified):
         rows_alertes += (
             f"<tr style='border-bottom:1px solid #eee'>"
             f"<td style='padding:7px 8px;color:#dc2626;font-weight:bold'>{a['distance_m']}m</td>"
-            f"<td style='padding:7px 8px'>{a['commune']}</td>"
+            f"<td style='padding:7px 8px'>{esc(a['commune'])}</td>"
             f"<td style='padding:7px 8px;font-size:12px;color:#666'>{a['nature_travaux'][:50]}</td>"
             f"<td style='padding:7px 8px;font-size:12px'>{a['date_fao']}</td>"
             f"<td style='padding:7px 8px;font-size:11px;color:#888'>{a['label_adresse']}</td>"
@@ -969,7 +969,7 @@ def send_monthly_confirmation(user, notified):
         rows_zone += (
             f"<tr style='border-bottom:1px solid #eee'>"
             f"<td style='padding:7px 8px;color:#f59e0b;font-weight:bold'>{z['distance_m']}m</td>"
-            f"<td style='padding:7px 8px'>{z['commune']}</td>"
+            f"<td style='padding:7px 8px'>{esc(z['commune'])}</td>"
             f"<td style='padding:7px 8px;font-size:12px;color:#666'>{z['nature_travaux'][:50]}</td>"
             f"<td style='padding:7px 8px;font-size:12px'>{z['date_fao']}</td>"
             f"</tr>"
@@ -1053,7 +1053,7 @@ def send_rappel_j7(user, notified, enquetes):
     email  = user["email"]
     if not user.get('notif_rappel', True):
         return  # IDEA-U07: rappels désactivés par l'utilisateur
-    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+    prenom = esc(user["nom"].split()[0] if user["nom"] else "bonjour")
 
     for adr in user["adresses"]:
         if not adr.get("lat"):
@@ -1083,9 +1083,9 @@ def send_rappel_j7(user, notified, enquetes):
             if not (5 <= jours_restants <= 8):
                 continue
 
-            lieu     = enquete.get("lieu", "--")
-            commune  = enquete.get("commune", "--")
-            nature   = enquete.get("natureTravaux", "--")
+            lieu     = esc(enquete.get("lieu", "--"))
+            commune  = esc(enquete.get("commune", "--"))
+            nature   = esc(enquete.get("natureTravaux", "--"))
             date_fao = format_date(ts_ms)
             commune_url = find_commune_enquetes_url(commune.upper()) if commune else None
             lien     = commune_url if commune_url else FAO_BASE_URL
@@ -1137,7 +1137,7 @@ def send_zone_elargie_newsletter(user, notified):
     if key in notified:
         return
 
-    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+    prenom = esc(user["nom"].split()[0] if user["nom"] else "bonjour")
     zone_mois = load_zone_elargie_from_sheet(email, mois)
 
     if not zone_mois:
@@ -1214,7 +1214,7 @@ def send_annual_summary(user, notified):
     if key in notified:
         return
 
-    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+    prenom = esc(user["nom"].split()[0] if user["nom"] else "bonjour")
 
     # Lire l'historique depuis le Sheet pour l'année écoulée
     try:
@@ -1261,7 +1261,7 @@ def send_annual_summary(user, notified):
         f"<p style='font-size:14px;color:#444;line-height:1.7'>Voici le bilan de votre surveillance PhémeApp pour l'année <strong>{annee}</strong>.</p>"
         f"<div style='background:#f0fdf4;border-left:3px solid {couleur};padding:16px 18px;margin:16px 0;border-radius:0 6px 6px 0'>"
         f"<p style='margin:0;font-size:14px;color:#0f4a2a'>{emoji} {msg_bilan}</p>"
-        + (f"<p style='margin:8px 0 0;font-size:13px;color:#555'>Commune la plus active dans votre périmètre : <strong>{top_commune}</strong></p>" if top_commune else "")
+        + (f"<p style='margin:8px 0 0;font-size:13px;color:#555'>Commune la plus active dans votre périmètre : <strong>{esc(top_commune)}</strong></p>" if top_commune else "")
         + "</div>"
         "<p style='font-size:14px;color:#444;line-height:1.7'>Merci de faire confiance à PhémeApp pour surveiller votre environnement. Votre surveillance continue en {annee+1}.</p>"
         f"<p style='font-size:13px;color:#888;margin-top:16px'><a href='{magic_lien}' style='color:#1a3a5c;font-weight:500'>Mon espace PhémeApp →</a></p>"
@@ -1308,7 +1308,7 @@ def send_weekly_summary(user, notified, enquetes):
     if alerte_cette_semaine:
         return  # Déjà alerté cette semaine, pas de résumé
 
-    prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
+    prenom = esc(user["nom"].split()[0] if user["nom"] else "bonjour")
     total  = len(enquetes)
 
     # Stats zone élargie
@@ -1479,13 +1479,13 @@ def generate_admin_dashboard(notified, users, enquetes):
         top_communes = sorted(communes.items(), key=lambda x: x[1], reverse=True)[:10]
 
         communes_rows = "".join(
-            f"<tr><td style='padding:8px'>{c}</td><td style='padding:8px;text-align:right;font-weight:bold'>{n}</td></tr>"
+            f"<tr><td style='padding:8px'>{esc(c)}</td><td style='padding:8px;text-align:right;font-weight:bold'>{n}</td></tr>"
             for c, n in top_communes
         )
 
         users_rows = "".join(
-            f"<tr><td style='padding:8px;font-size:13px'>{u['email']}</td>"
-            f"<td style='padding:8px;font-size:13px'>{u['nom']}</td>"
+            f"<tr><td style='padding:8px;font-size:13px'>{esc(u['email'])}</td>"
+            f"<td style='padding:8px;font-size:13px'>{esc(u['nom'])}</td>"
             f"<td style='padding:8px;font-size:13px'>{len(u['adresses'])} adresse(s)</td></tr>"
             for u in users
         )

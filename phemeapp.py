@@ -499,7 +499,7 @@ def send_welcome_email(dest_email, dest_nom, adresses):
 def format_date(ts_ms):
     try:
         return datetime.fromtimestamp(ts_ms / 1000).strftime("%d.%m.%Y")
-    except:
+    except Exception:
         return "date inconnue"
 
 def send_email(dest_email, dest_nom, enquete, adresse, distance_m, profil=''):
@@ -507,7 +507,7 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m, profil=''):
     try:
         jours_restants = max(0, (datetime.fromtimestamp(enquete.get("dateFao",0)/1000) + timedelta(days=30) - datetime.now()).days)
         urgence = jours_restants <= 7
-    except:
+    except Exception:
         jours_restants = 30
         urgence = False
     # Variables couleur pour le HTML (evite ternaires dans f-strings)
@@ -792,7 +792,7 @@ def log_alerte_historique(user, adr, enquete, distance_m):
     date_fao = format_date(enquete.get("dateFao", 0))
     try:
         jours_restants = max(0, (datetime.fromtimestamp(enquete.get("dateFao",0)/1000) + timedelta(days=30) - datetime.now()).days)
-    except:
+    except Exception:
         jours_restants = 30
     row = {
         "date_envoi":       datetime.now().isoformat(),
@@ -816,7 +816,7 @@ def log_zone_elargie(user, adr, enquete, distance_m):
     date_fao = format_date(enquete.get("dateFao", 0))
     try:
         jours_restants = max(0, (datetime.fromtimestamp(enquete.get("dateFao",0)/1000) + timedelta(days=30) - datetime.now()).days)
-    except:
+    except Exception:
         jours_restants = 30
     row = {
         "date_detection":   datetime.now().isoformat(),
@@ -1228,7 +1228,8 @@ def send_annual_summary(user, notified):
         alertes_annee = [r for r in rows
                          if len(r) > 1 and r[1].strip().lower() == email.lower()
                          and str(annee) in r[0]]
-    except:
+    except Exception as e:
+        log(f"Lecture historique annuel: {e}", "warning")
         alertes_annee = []
 
     nb_alertes = len(alertes_annee)
@@ -1412,14 +1413,17 @@ def get_tracking_pixel(email, no_camac):
 
 def generate_magic_token(email):
     """
-    IDEA-U01: Token magic link valide 30 jours.
-    Basé sur email + mois courant + secret.
-    Renouvelé automatiquement chaque mois.
+    IDEA-U01 + SEC-09: Token magic link HMAC-SHA256 valide 30 jours.
+    HMAC résiste aux attaques par extension de longueur vs SHA256 simple.
     """
-    import hashlib
+    import hashlib, hmac
     mois = datetime.now().strftime("%Y-%m")
-    raw = f"{email}:{mois}:{MAGIC_LINK_SECRET}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:32]
+    raw = f"{email}:{mois}"
+    return hmac.new(
+        MAGIC_LINK_SECRET.encode("utf-8"),
+        raw.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()[:32]
 
 def get_magic_link(email):
     """Retourne l'URL complète de l'espace utilisateur."""
@@ -1440,9 +1444,13 @@ def verify_magic_token(email, token):
             else:
                 d = d.replace(month=d.month-1)
         mois = d.strftime("%Y-%m")
-        import hashlib
-        raw = f"{email}:{mois}:{MAGIC_LINK_SECRET}"
-        expected = hashlib.sha256(raw.encode()).hexdigest()[:32]
+        import hashlib, hmac
+        raw = f"{email}:{mois}"
+        expected = hmac.new(
+            MAGIC_LINK_SECRET.encode("utf-8"),
+            raw.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()[:32]
         if token == expected:
             return True
     return False
@@ -1555,7 +1563,7 @@ def check_dossiers_retires(user, notified, enquetes):
             jours = (datetime.now() - date_alerte).days
             if jours > 35:
                 continue  # Trop vieux, normal qu'il soit parti
-        except:
+        except Exception:
             continue
 
         # Le dossier n'est plus dans CAMAC
@@ -1608,9 +1616,11 @@ def is_new_enquete(no_camac, notified):
     return str(no_camac) not in get_cached_camac_ids(notified)
 
 
+DATA_RETENTION_DAYS = 730  # SEC-07: rétention max 2 ans (nLPD suisse)
+
 def purge_old_notified(notified, max_days=90):
     """
-    IDEA-T16: Supprime les entrées de plus de max_days jours dans notified.
+    IDEA-T16 + SEC-07: Supprime les entrées de plus de max_days jours dans notified.
     Garde toutes les clés welcome: et monthly: (pas de date limite).
     Réduit la taille du fichier au fil du temps.
     """
@@ -1642,7 +1652,7 @@ def ping_healthcheck(fail=False):
         url = HEALTHCHECK_URL + ("/fail" if fail else "")
         requests.get(url, timeout=5)
         log("Healthcheck ping: OK" + (" (FAIL)" if fail else ""))
-    except:
+    except Exception:
         pass
 
 def send_admin_alert(subject, body):

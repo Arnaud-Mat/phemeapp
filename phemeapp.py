@@ -701,7 +701,7 @@ def find_commune_enquetes_url(commune_name):
                     found_url = url
                     log(f"  URL fallback validee pour {commune_name}: {found_url}")
                     break
-            except:
+            except Exception:
                 continue
 
     # Sauvegarder dans le cache
@@ -1076,7 +1076,7 @@ def send_rappel_j7(user, notified, enquetes):
                 date_pub = datetime.fromtimestamp(ts_ms / 1000)
                 date_limite = date_pub + timedelta(days=30)
                 jours_restants = (date_limite - datetime.now()).days
-            except:
+            except Exception:
                 continue
 
             # Envoyer seulement si entre 5 et 8 jours restants

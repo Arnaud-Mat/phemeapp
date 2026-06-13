@@ -517,6 +517,7 @@ def _run_with_mocks(phemeapp, smtp_mock, users_mock, notified_mock, enquetes_moc
         phemeapp.run()
 
 
+@pytest.mark.slow
 def test_integration_nouvel_utilisateur_recoit_bienvenue():
     """Pipeline: nouvel utilisateur → email de bienvenue envoyé."""
     import phemeapp
@@ -533,6 +534,7 @@ def test_integration_nouvel_utilisateur_recoit_bienvenue():
     assert len(bienvenus) >= 1, f"Email bienvenue attendu, reçu: {[e['subj'] for e in emails]}"
 
 
+@pytest.mark.slow
 def test_integration_alerte_envoyee_si_match():
     """Pipeline: enquête dans périmètre → alerte envoyée."""
     import phemeapp
@@ -557,6 +559,7 @@ def test_integration_alerte_envoyee_si_match():
     assert len(alertes) >= 1, f"Alerte attendue, emails: {[e['subj'] for e in emails]}"
 
 
+@pytest.mark.slow
 def test_integration_pas_dalerte_hors_perimetre():
     """Pipeline: enquête hors périmètre → aucune alerte."""
     import phemeapp
@@ -581,6 +584,7 @@ def test_integration_pas_dalerte_hors_perimetre():
     assert len(alertes) == 0, f"Aucune alerte hors périmètre, reçu: {alertes}"
 
 
+@pytest.mark.slow
 def test_integration_pas_doublon_alerte():
     """Pipeline: enquête déjà notifiée → pas de doublon."""
     import phemeapp

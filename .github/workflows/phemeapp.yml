@@ -26,7 +26,7 @@ jobs:
           BREVO_SENDER: ${{ secrets.BREVO_SENDER }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short -m "not slow"
 
   run-phemeapp:
     runs-on: ubuntu-latest

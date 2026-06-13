@@ -22,6 +22,7 @@ Dépendances :
 """
 
 import base64
+import html as _html
 import csv
 import io
 import json
@@ -39,14 +40,38 @@ from urllib.parse import quote as url_quote
 # CONFIGURATION
 # ─────────────────────────────────────────────
 
-BREVO_SMTP_LOGIN  = os.environ.get("BREVO_SMTP_LOGIN", "ae1387001@smtp-brevo.com")
-BREVO_API_KEY     = os.environ.get("BREVO_API_KEY", "xsmtpsib-c35d132ff59c0a7acd47584a3064fd78986954a2a1ec3cda491e4246b3f96516-MLMfUsjvSEhDzf9F")
+BREVO_SMTP_LOGIN  = os.environ.get("BREVO_SMTP_LOGIN", "")
+BREVO_API_KEY     = os.environ.get("BREVO_API_KEY", "")
 BREVO_SENDER      = os.environ.get("BREVO_SENDER", "alerte@phemeapp.ch")
 BREVO_SENDER_NAME = "PhémeApp"
 
 # Google Sheet public (lecture seule)
 # Format: https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}
-SHEET_ID          = os.environ.get("SHEET_ID", "1YLK-KV_W7sNraeZdsyttykh1OnYU5aJOhl_NIqwFsJw")
+SHEET_ID          = os.environ.get("SHEET_ID", "")
+# SEC-01: vérification que les secrets critiques sont définis
+def esc(value):
+    """SEC-03: Échappe les données externes avant insertion dans le HTML."""
+    if value is None:
+        return ""
+    return _html.escape(str(value), quote=True)
+
+
+def is_valid_email(email):
+    """SEC-02: Validation format email avant tout traitement."""
+    import re as _re
+    if not email or not isinstance(email, str):
+        return False
+    return bool(_re.match(r'^[\w.+\-]+@[\w\-]+\.[\w.]+$', email.strip()))
+
+
+def _check_required_secrets():
+    missing = []
+    for var in ["BREVO_API_KEY", "BREVO_SMTP_LOGIN", "BREVO_SENDER", "SHEET_ID"]:
+        if not os.environ.get(var):
+            missing.append(var)
+    if missing:
+        raise EnvironmentError(f"Variables d'environnement manquantes: {', '.join(missing)}")
+
 HEALTHCHECK_URL   = os.environ.get("HEALTHCHECK_URL", "")   # IDEA-T05: https://hc-ping.com/XXXX
 ADMIN_EMAIL       = os.environ.get("ADMIN_EMAIL", "arnaud.mathier@gmail.com")
 SHEET_TAB         = "Form Responses 1"
@@ -427,8 +452,8 @@ def send_welcome_email(dest_email, dest_nom, adresses):
     unsub_lien = get_unsub_link(dest_email)
     magic_lien = get_magic_link(dest_email)
     adresses_html = "".join([
-        f'<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 10px;color:#888;">{a["label"]}</td>'
-        f'<td style="padding:8px 10px;">{a["adresse"]}</td></tr>'
+        f'<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 10px;color:#888;">{esc(a["label"])}</td>'
+        f'<td style="padding:8px 10px;">{esc(a["adresse"])}</td></tr>'
         for a in adresses])
     html = f"""<html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;">
 <div style="background:#1a3a5c;padding:18px 24px;">
@@ -494,8 +519,8 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m, profil=''):
     no_camac    = enquete.get("noCamac", "?")
     unsub_lien  = get_unsub_link(dest_email)
     magic_lien   = get_magic_link(dest_email)
-    lieu        = enquete.get("lieu", "—")
-    commune     = enquete.get("commune", "—")
+    lieu        = esc(enquete.get("lieu", "—"))
+    commune     = esc(enquete.get("commune", "—"))
     description = enquete.get("description", "—")
     nature      = enquete.get("natureTravaux", "—")
     fao_lib     = enquete.get("faoLib", "")

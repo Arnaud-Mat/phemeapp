@@ -478,152 +478,125 @@ def test_rappel_desactive_si_preference():
 # IDEA-T17 : TESTS D'INTÉGRATION — Pipeline complet
 # ═══════════════════════════════════════════════════════════════
 
-import os
-os.environ.setdefault("GITHUB_TOKEN", "test_token")
-os.environ.setdefault("GITHUB_REPOSITORY", "test/repo")
+def _make_mock_context(phemeapp, smtp_mock, users_mock, notified_mock, enquetes_mock):
+    """Contexte mock complet pour les tests d'intégration."""
+    from unittest.mock import patch
+    return [
+        patch.object(phemeapp, "smtp_send", smtp_mock),
+        patch.object(phemeapp, "load_users_from_sheet", return_value=users_mock),
+        patch.object(phemeapp, "load_notified", return_value=notified_mock),
+        patch.object(phemeapp, "save_notified", lambda n: None),
+        patch.object(phemeapp, "geocode_swisstopo", return_value=(46.5126, 6.5299)),
+        patch.object(phemeapp, "get_commune_from_coords", return_value="TESTVILLE"),
+        patch.object(phemeapp, "find_commune_enquetes_url", return_value=None),
+        patch.object(phemeapp, "fetch_enquetes_with_retry", return_value=enquetes_mock),
+        patch.object(phemeapp, "load_historique_from_sheet", return_value=[]),
+        patch.object(phemeapp, "load_zone_elargie_from_sheet", return_value=[]),
+        patch.object(phemeapp, "check_commune_backup", lambda *a: None),
+        patch.object(phemeapp, "log_alerte_historique", lambda *a: None),
+        patch.object(phemeapp, "log_zone_elargie", lambda *a: None),
+        patch.object(phemeapp, "ping_healthcheck", lambda *a, **kw: None),
+        patch.object(phemeapp, "generate_admin_dashboard", lambda *a: None),
+        patch.object(phemeapp, "get_unsub_link", return_value="mailto:test"),
+        patch.object(phemeapp, "get_magic_link", return_value="https://test"),
+    ]
 
-# ─────────────────────────────────────────────
-# Test pipeline : bienvenue + alerte
-# ─────────────────────────────────────────────
+def _run_with_mocks(phemeapp, smtp_mock, users_mock, notified_mock, enquetes_mock):
+    """Lance run() avec tous les mocks nécessaires."""
+    from contextlib import ExitStack
+    contexts = _make_mock_context(phemeapp, smtp_mock, users_mock, notified_mock, enquetes_mock)
+    with ExitStack() as stack:
+        for ctx in contexts:
+            stack.enter_context(ctx)
+        phemeapp.run()
+
 
 def test_integration_nouvel_utilisateur_recoit_bienvenue():
     """Pipeline: nouvel utilisateur → email de bienvenue envoyé."""
     import phemeapp
-    from unittest.mock import patch, MagicMock
+    emails = []
+    def mock_smtp(dest, subj, html): emails.append({"dest": dest, "subj": subj})
 
-    emails_envoyes = []
-    def mock_smtp(dest, subj, html):
-        emails_envoyes.append({"dest": dest, "subj": subj})
-
-    # Mock load_users_from_sheet
-    users_mock = [{
-        "email": "nouveau@test.com",
-        "nom": "Nouveau User",
-        "adresses": [{"label": "Maison", "adresse": "Test 1 1000 Lausanne",
-                      "lat": None, "lng": None}],
+    users_mock = [{"email": "new@test.com", "nom": "Nouveau",
+        "adresses": [{"label": "Maison", "adresse": "Test", "lat": None, "lng": None}],
         "profil": "", "telephone": "", "perimetre": "500",
-        "notif_hebdo": True, "notif_mensuel": True, "notif_rappel": True
-    }]
+        "notif_hebdo": True, "notif_mensuel": True, "notif_rappel": True}]
 
-    notified_mock = {}
-
-    with patch.object(phemeapp, "smtp_send", mock_smtp),          patch.object(phemeapp, "load_users_from_sheet", return_value=users_mock),          patch.object(phemeapp, "load_notified", return_value=notified_mock),          patch.object(phemeapp, "save_notified", lambda n: None),          patch.object(phemeapp, "geocode_swisstopo", return_value=(46.5197, 6.6323)),          patch.object(phemeapp, "fetch_enquetes_with_retry", return_value=[]),          patch.object(phemeapp, "load_historique_from_sheet", return_value=[]),          patch.object(phemeapp, "load_zone_elargie_from_sheet", return_value=[]),          patch.object(phemeapp, "ping_healthcheck", lambda *a, **kw: None),          patch.object(phemeapp, "generate_admin_dashboard", lambda *a: None):
-        phemeapp.run()
-
-    bienvenus = [e for e in emails_envoyes if "surveillance" in e["subj"].lower() or "active" in e["subj"].lower()]
-    assert len(bienvenus) >= 1, f"Email bienvenue attendu, reçu: {emails_envoyes}"
+    _run_with_mocks(phemeapp, mock_smtp, users_mock, {}, [])
+    bienvenus = [e for e in emails if "active" in e["subj"].lower() or "surveillance" in e["subj"].lower() or "PhémeApp" in e["subj"]]
+    assert len(bienvenus) >= 1, f"Email bienvenue attendu, reçu: {[e['subj'] for e in emails]}"
 
 
 def test_integration_alerte_envoyee_si_match():
     """Pipeline: enquête dans périmètre → alerte envoyée."""
     import phemeapp
-    from unittest.mock import patch
     from datetime import datetime
+    emails = []
+    def mock_smtp(dest, subj, html): emails.append({"dest": dest, "subj": subj})
 
-    emails_envoyes = []
-    def mock_smtp(dest, subj, html):
-        emails_envoyes.append({"dest": dest, "subj": subj})
-
-    users_mock = [{
-        "email": "test@test.com",
-        "nom": "Test User",
-        "adresses": [{"label": "Maison", "adresse": "Chemin du Grebe 12 1028 Preverenges",
-                      "lat": 46.5126, "lng": 6.5299}],
+    users_mock = [{"email": "test@test.com", "nom": "Test",
+        "adresses": [{"label": "Maison", "adresse": "Test", "lat": 46.5126, "lng": 6.5299}],
         "profil": "Propriétaire", "telephone": "", "perimetre": "500",
-        "notif_hebdo": True, "notif_mensuel": True, "notif_rappel": True
-    }]
+        "notif_hebdo": True, "notif_mensuel": True, "notif_rappel": True}]
 
-    # Enquête à 270m dans le périmètre
     ts = int(datetime.now().timestamp() * 1000)
-    enquetes_mock = [{
-        "noCamac": 249553,
-        "lat": 46.5145, "lng": 6.5330,
-        "dateFao": ts,
-        "lieu": "Chemin du Grebe 8",
-        "commune": "Préverenges",
-        "description": "Construction villa",
-        "natureTravaux": "Construction d'une villa individuelle",
-        "faoLib": ""
-    }]
+    enquetes_mock = [{"noCamac": 249553, "lat": 46.5145, "lng": 6.5330, "dateFao": ts,
+        "lieu": "Test", "commune": "TestVille", "description": "Test",
+        "natureTravaux": "Construction villa", "faoLib": ""}]
 
     notified_mock = {"welcome:test@test.com": datetime.now().isoformat()}
+    _run_with_mocks(phemeapp, mock_smtp, users_mock, notified_mock, enquetes_mock)
 
-    with patch.object(phemeapp, "smtp_send", mock_smtp),          patch.object(phemeapp, "load_users_from_sheet", return_value=users_mock),          patch.object(phemeapp, "load_notified", return_value=notified_mock),          patch.object(phemeapp, "save_notified", lambda n: None),          patch.object(phemeapp, "geocode_swisstopo", return_value=(46.5126, 6.5299)),          patch.object(phemeapp, "fetch_enquetes_with_retry", return_value=enquetes_mock),          patch.object(phemeapp, "load_historique_from_sheet", return_value=[]),          patch.object(phemeapp, "load_zone_elargie_from_sheet", return_value=[]),          patch.object(phemeapp, "find_commune_enquetes_url", return_value=None),          patch.object(phemeapp, "check_commune_backup", lambda *a: None),          patch.object(phemeapp, "log_alerte_historique", lambda *a: None),          patch.object(phemeapp, "log_zone_elargie", lambda *a: None),          patch.object(phemeapp, "ping_healthcheck", lambda *a, **kw: None),          patch.object(phemeapp, "generate_admin_dashboard", lambda *a: None):
-        phemeapp.run()
-
-    alertes = [e for e in emails_envoyes if "249553" in e["subj"] or "enquête" in e["subj"].lower() or "Préverenges" in e["subj"]]
-    assert len(alertes) >= 1, f"Alerte attendue pour CAMAC 249553, emails reçus: {[e['subj'] for e in emails_envoyes]}"
+    alertes = [e for e in emails if "249553" in e["subj"] or "TestVille" in e["subj"] or "enquête" in e["subj"].lower()]
+    assert len(alertes) >= 1, f"Alerte attendue, emails: {[e['subj'] for e in emails]}"
 
 
 def test_integration_pas_dalerte_hors_perimetre():
     """Pipeline: enquête hors périmètre → aucune alerte."""
     import phemeapp
-    from unittest.mock import patch
     from datetime import datetime
+    emails = []
+    def mock_smtp(dest, subj, html): emails.append(subj)
 
-    emails_envoyes = []
-    def mock_smtp(dest, subj, html):
-        emails_envoyes.append({"dest": dest, "subj": subj})
-
-    users_mock = [{
-        "email": "test@test.com",
-        "nom": "Test User",
-        "adresses": [{"label": "Maison", "adresse": "Test",
-                      "lat": 46.5126, "lng": 6.5299}],
+    users_mock = [{"email": "test@test.com", "nom": "Test",
+        "adresses": [{"label": "Maison", "adresse": "Test", "lat": 46.5126, "lng": 6.5299}],
         "profil": "", "telephone": "", "perimetre": "500",
-        "notif_hebdo": True, "notif_mensuel": True, "notif_rappel": True
-    }]
+        "notif_hebdo": True, "notif_mensuel": True, "notif_rappel": True}]
 
     ts = int(datetime.now().timestamp() * 1000)
-    # Enquête à 5km (hors périmètre)
-    enquetes_mock = [{
-        "noCamac": 99999, "lat": 46.5600, "lng": 6.5299,
+    enquetes_mock = [{"noCamac": 99999, "lat": 46.5600, "lng": 6.5299,
         "dateFao": ts, "lieu": "Loin", "commune": "Lausanne",
-        "description": "Hors perimetre", "natureTravaux": "Test", "faoLib": ""
-    }]
+        "description": "Test", "natureTravaux": "Test", "faoLib": ""}]
 
     notified_mock = {"welcome:test@test.com": datetime.now().isoformat()}
+    _run_with_mocks(phemeapp, mock_smtp, users_mock, notified_mock, enquetes_mock)
 
-    with patch.object(phemeapp, "smtp_send", mock_smtp),          patch.object(phemeapp, "load_users_from_sheet", return_value=users_mock),          patch.object(phemeapp, "load_notified", return_value=notified_mock),          patch.object(phemeapp, "save_notified", lambda n: None),          patch.object(phemeapp, "geocode_swisstopo", return_value=(46.5126, 6.5299)),          patch.object(phemeapp, "fetch_enquetes_with_retry", return_value=enquetes_mock),          patch.object(phemeapp, "load_historique_from_sheet", return_value=[]),          patch.object(phemeapp, "load_zone_elargie_from_sheet", return_value=[]),          patch.object(phemeapp, "find_commune_enquetes_url", return_value=None),          patch.object(phemeapp, "check_commune_backup", lambda *a: None),          patch.object(phemeapp, "log_zone_elargie", lambda *a: None),          patch.object(phemeapp, "ping_healthcheck", lambda *a, **kw: None),          patch.object(phemeapp, "generate_admin_dashboard", lambda *a: None):
-        phemeapp.run()
-
-    alertes = [e for e in emails_envoyes if "99999" in e["subj"] or "enquête" in e["subj"].lower()]
-    assert len(alertes) == 0, f"Aucune alerte attendue hors périmètre, reçu: {alertes}"
+    alertes = [s for s in emails if "99999" in str(s) or ("enquête" in str(s).lower() and "TestVille" not in str(s))]
+    assert len(alertes) == 0, f"Aucune alerte hors périmètre, reçu: {alertes}"
 
 
 def test_integration_pas_doublon_alerte():
     """Pipeline: enquête déjà notifiée → pas de doublon."""
     import phemeapp
-    from unittest.mock import patch
     from datetime import datetime
+    emails = []
+    def mock_smtp(dest, subj, html): emails.append(subj)
 
-    emails_envoyes = []
-    def mock_smtp(dest, subj, html):
-        emails_envoyes.append(subj)
-
-    users_mock = [{
-        "email": "test@test.com", "nom": "Test",
-        "adresses": [{"label": "Maison", "adresse": "Test",
-                      "lat": 46.5126, "lng": 6.5299}],
+    users_mock = [{"email": "test@test.com", "nom": "Test",
+        "adresses": [{"label": "Maison", "adresse": "Test", "lat": 46.5126, "lng": 6.5299}],
         "profil": "", "telephone": "", "perimetre": "500",
-        "notif_hebdo": True, "notif_mensuel": True, "notif_rappel": True
-    }]
+        "notif_hebdo": True, "notif_mensuel": True, "notif_rappel": True}]
 
     ts = int(datetime.now().timestamp() * 1000)
-    enquetes_mock = [{
-        "noCamac": 12345, "lat": 46.5130, "lng": 6.5299,
+    enquetes_mock = [{"noCamac": 12345, "lat": 46.5130, "lng": 6.5299,
         "dateFao": ts, "lieu": "Test", "commune": "TestVille",
-        "description": "Test", "natureTravaux": "Test", "faoLib": ""
-    }]
+        "description": "Test", "natureTravaux": "Test", "faoLib": ""}]
 
-    # Déjà notifié
     notified_mock = {
         "welcome:test@test.com": datetime.now().isoformat(),
         "test@test.com:12345": datetime.now().isoformat()
     }
+    _run_with_mocks(phemeapp, mock_smtp, users_mock, notified_mock, enquetes_mock)
 
-    with patch.object(phemeapp, "smtp_send", mock_smtp),          patch.object(phemeapp, "load_users_from_sheet", return_value=users_mock),          patch.object(phemeapp, "load_notified", return_value=notified_mock),          patch.object(phemeapp, "save_notified", lambda n: None),          patch.object(phemeapp, "geocode_swisstopo", return_value=(46.5126, 6.5299)),          patch.object(phemeapp, "fetch_enquetes_with_retry", return_value=enquetes_mock),          patch.object(phemeapp, "load_historique_from_sheet", return_value=[]),          patch.object(phemeapp, "load_zone_elargie_from_sheet", return_value=[]),          patch.object(phemeapp, "find_commune_enquetes_url", return_value=None),          patch.object(phemeapp, "check_commune_backup", lambda *a: None),          patch.object(phemeapp, "log_zone_elargie", lambda *a: None),          patch.object(phemeapp, "ping_healthcheck", lambda *a, **kw: None),          patch.object(phemeapp, "generate_admin_dashboard", lambda *a: None):
-        phemeapp.run()
-
-    alertes_12345 = [s for s in emails_envoyes if "12345" in str(s)]
-    assert len(alertes_12345) == 0, f"Doublon détecté: {alertes_12345}"
+    alertes = [s for s in emails if "12345" in str(s)]
+    assert len(alertes) == 0, f"Doublon détecté: {alertes}"

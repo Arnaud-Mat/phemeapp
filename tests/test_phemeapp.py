@@ -481,8 +481,14 @@ def test_rappel_desactive_si_preference():
 def _make_mock_context(phemeapp, smtp_mock, users_mock, notified_mock, enquetes_mock):
     """Contexte mock complet pour les tests d'intégration."""
     from unittest.mock import patch
+    from unittest.mock import MagicMock
+    mock_smtp_instance = MagicMock()
+    mock_smtp_cls = MagicMock(return_value=mock_smtp_instance)
+    mock_smtp_instance.__enter__ = MagicMock(return_value=mock_smtp_instance)
+    mock_smtp_instance.__exit__ = MagicMock(return_value=False)
     return [
         patch.object(phemeapp, "smtp_send", smtp_mock),
+        patch("phemeapp.smtplib.SMTP", mock_smtp_cls),
         patch.object(phemeapp, "load_users_from_sheet", return_value=users_mock),
         patch.object(phemeapp, "load_notified", return_value=notified_mock),
         patch.object(phemeapp, "save_notified", lambda n: None),

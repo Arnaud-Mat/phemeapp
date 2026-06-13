@@ -475,7 +475,7 @@ def format_date(ts_ms):
     except:
         return "date inconnue"
 
-def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
+def send_email(dest_email, dest_nom, enquete, adresse, distance_m, profil=''):
     date_fao    = format_date(enquete.get("dateFao", 0))
     try:
         jours_restants = max(0, (datetime.fromtimestamp(enquete.get("dateFao",0)/1000) + timedelta(days=30) - datetime.now()).days)
@@ -500,6 +500,7 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m):
     # BUG-007 fix: lien vers site communal si disponible, sinon FAO Vaud
     commune_url = find_commune_enquetes_url(commune.upper()) if commune and commune != "—" else None
     lien        = commune_url if commune_url else FAO_BASE_URL
+    msg_profil = ("<p style='font-size:13px;color:#dc2626;background:#fee2e2;padding:10px 14px;border-radius:6px;margin:12px 0'>Locataire: consultez le dossier gratuitement \u00e0 la commune.</p>" if profil and "locataire" in profil.lower() else "<p style='font-size:13px;color:#666'>En cas de doute, contactez votre commune.</p>")
     # IDEA-P15: lien cadastre vaudois (geo.vd.ch)
     lat_enq = enquete.get("lat", "")
     lng_enq = enquete.get("lng", "")
@@ -1685,7 +1686,7 @@ def run():
                 dist = haversine_m(adr["lat"], adr["lng"], enquete["lat"], enquete["lng"])
                 if dist <= PERIMETER_M:
                     log(f"  MATCH! CAMAC {no_camac} à {round(dist)}m de '{adr['label']}' ({user['email']})")
-                    if send_email(user["email"], user["nom"], enquete, adr, dist):
+                    if send_email(user["email"], user["nom"], enquete, adr, dist, user.get("profil", "")):
                         mark_notified_with_context(notified, user["email"], no_camac, enquete)
                         log_alerte_historique(user, adr, enquete, dist)
                         total += 1

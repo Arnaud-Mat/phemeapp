@@ -311,3 +311,58 @@ function handleUnsubscribe(email, token) {
     .createTextOutput(JSON.stringify({error: "Email non trouvé"}))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+
+// ─────────────────────────────────────────────
+// E) IDEA-T11 : Déclencher GitHub Actions depuis onFormSubmit
+// Résout BUG-006 : email de bienvenue immédiat
+// ─────────────────────────────────────────────
+var GITHUB_TOKEN_GAS  = PropertiesService.getScriptProperties().getProperty("GITHUB_TOKEN") || "";
+var GITHUB_REPO_GAS   = "Arnaud-Mat/phemeapp";
+
+function triggerGitHubActions() {
+  // Déclencher un workflow_dispatch sur phemeapp.yml
+  if (!GITHUB_TOKEN_GAS) {
+    Logger.log("GITHUB_TOKEN non configuré dans ScriptProperties");
+    return false;
+  }
+  try {
+    var url = "https://api.github.com/repos/" + GITHUB_REPO_GAS + "/actions/workflows/phemeapp.yml/dispatches";
+    var options = {
+      method: "post",
+      headers: {
+        "Authorization": "token " + GITHUB_TOKEN_GAS,
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json"
+      },
+      payload: JSON.stringify({ref: "main"}),
+      muteHttpExceptions: true
+    };
+    var resp = UrlFetchApp.fetch(url, options);
+    if (resp.getResponseCode() === 204) {
+      Logger.log("GitHub Actions déclenché avec succès");
+      return true;
+    } else {
+      Logger.log("Erreur GitHub Actions: " + resp.getContentText());
+      return false;
+    }
+  } catch(e) {
+    Logger.log("Exception triggerGitHubActions: " + e.toString());
+    return false;
+  }
+}
+
+// Mettre à jour onFormSubmit pour déclencher GitHub Actions
+// Remplace la version précédente de onFormSubmit
+function onFormSubmit_withTrigger(e) {
+  // 1. Envoyer l'email de bienvenue immédiatement
+  onFormSubmit(e);
+  // 2. Déclencher un run GitHub Actions pour vérifier les alertes
+  // (permet de ne pas attendre le cron de 8h)
+  Utilities.sleep(2000); // Attendre que le Sheet soit mis à jour
+  triggerGitHubActions();
+  Logger.log("onFormSubmit_withTrigger terminé");
+}
+// Pour activer: configurer le déclencheur sur onFormSubmit_withTrigger
+// au lieu de onFormSubmit
+// Et ajouter GITHUB_TOKEN dans ScriptProperties (Extensions > Apps Script > Paramètres du projet)

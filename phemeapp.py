@@ -905,6 +905,8 @@ def send_monthly_confirmation(user, notified):
     key   = f"monthly:{email}:{mois}"
     if key in notified:
         return
+    if not user.get('notif_mensuel', True):
+        return  # IDEA-U07: désactivé par l'utilisateur
 
     prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
     unsub_lien = get_unsub_link(email)
@@ -1022,6 +1024,8 @@ def send_rappel_j7(user, notified, enquetes):
     Seulement pour les enquêtes dans le périmètre de 500m.
     """
     email  = user["email"]
+    if not user.get('notif_rappel', True):
+        return  # IDEA-U07: rappels désactivés par l'utilisateur
     prenom = user["nom"].split()[0] if user["nom"] else "bonjour"
 
     for adr in user["adresses"]:
@@ -1255,6 +1259,8 @@ def send_weekly_summary(user, notified, enquetes):
     # Seulement le lundi
     if datetime.now().weekday() != 0:
         return
+    if not user.get('notif_hebdo', True):
+        return  # IDEA-U07: désactivé par l'utilisateur
 
     email = user["email"]
     semaine = datetime.now().strftime("%Y-W%W")
@@ -1423,6 +1429,12 @@ def generate_admin_dashboard(notified, users, enquetes):
     """
     try:
         nb_users    = len(users)
+        # IDEA-T15: tendances CAMAC
+        types_travaux = {}
+        for e in enquetes:
+            nature = (e.get("natureTravaux") or "Autre")[:40]
+            types_travaux[nature] = types_travaux.get(nature, 0) + 1
+        top_types = sorted(types_travaux.items(), key=lambda x: x[1], reverse=True)[:8]
         nb_alertes  = sum(1 for k in notified if ":" in k and not k.startswith("monthly:") and not k.startswith("weekly:") and not k.startswith("rappel7:") and not k.startswith("newsletter_zone:") and not k.endswith(":ctx") and "welcome:" not in k)
         nb_enquetes = len(enquetes)
         communes    = {}

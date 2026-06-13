@@ -424,6 +424,8 @@ def smtp_send(dest, subject, html):
 
 def send_welcome_email(dest_email, dest_nom, adresses):
     prenom = dest_nom.split()[0] if dest_nom else "bonjour"
+    unsub_lien = get_unsub_link(dest_email)
+    magic_lien = get_magic_link(dest_email)
     adresses_html = "".join([
         f'<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 10px;color:#888;">{a["label"]}</td>'
         f'<td style="padding:8px 10px;">{a["adresse"]}</td></tr>'

@@ -1005,7 +1005,7 @@ def send_monthly_confirmation(user, notified):
         "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px'>"
         "PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. "
         f"&nbsp;<a href='{unsub_lien}' style='color:#bbb;font-size:10px'>Se désinscrire</a></p>"
-        f"{get_tracking_pixel(dest_email, no_camac)}"
+        f"{get_tracking_pixel(email, 'monthly')}"
         "</div></body></html>"
     )
 

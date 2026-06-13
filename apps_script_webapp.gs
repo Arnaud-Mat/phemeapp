@@ -366,3 +366,162 @@ function onFormSubmit_withTrigger(e) {
 // Pour activer: configurer le déclencheur sur onFormSubmit_withTrigger
 // au lieu de onFormSubmit
 // Et ajouter GITHUB_TOKEN dans ScriptProperties (Extensions > Apps Script > Paramètres du projet)
+
+
+// ─────────────────────────────────────────────
+// F) IDEA-U06 : Historique complet paginé
+//    Mise à jour de getUserData pour supporter page + limit
+// ─────────────────────────────────────────────
+function getUserDataPaginated(email, token, page, limit) {
+  page  = parseInt(page)  || 1;
+  limit = parseInt(limit) || 10;
+  
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  
+  // Adresses
+  var formSheet = ss.getSheetByName("Form Responses 1");
+  var adresses = [];
+  if (formSheet) {
+    var rows = formSheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i][2] && rows[i][2].toString().toLowerCase() === email.toLowerCase()) {
+        var adr1 = rows[i][3] || ""; var lab1 = rows[i][4] || "Adresse 1";
+        var adr2 = rows[i][5] || ""; var lab2 = rows[i][6] || "Adresse 2";
+        if (adr1) adresses.push({label: lab1, adresse: adr1});
+        if (adr2) adresses.push({label: lab2, adresse: adr2});
+        break;
+      }
+    }
+  }
+  
+  // Historique avec pagination
+  var histSheet = ss.getSheetByName("Historique Alertes");
+  var all_historique = [];
+  if (histSheet) {
+    var histRows = histSheet.getDataRange().getValues();
+    for (var j = 1; j < histRows.length; j++) {
+      if (histRows[j][1] && histRows[j][1].toString().toLowerCase() === email.toLowerCase()) {
+        all_historique.push({
+          date_envoi:     histRows[j][0] ? histRows[j][0].toString().substring(0,10) : "",
+          commune:        histRows[j][7] || "--",
+          nature_travaux: histRows[j][8] || "--",
+          distance_m:     histRows[j][9] || 0,
+          date_fao:       histRows[j][10] || "--",
+          lien:           histRows[j][11] || ""
+        });
+      }
+    }
+    all_historique.reverse();
+  }
+  
+  var total   = all_historique.length;
+  var pages   = Math.ceil(total / limit);
+  var start   = (page - 1) * limit;
+  var end     = Math.min(start + limit, total);
+  var historique = all_historique.slice(start, end);
+  
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      valid: true, email: email, adresses: adresses,
+      historique: historique,
+      pagination: {page: page, limit: limit, total: total, pages: pages},
+      unsub_url: "mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp"
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ─────────────────────────────────────────────
+// G) IDEA-U03 : Modifier ses adresses depuis Mon compte
+// ─────────────────────────────────────────────
+function handleUpdateAddresses(email, token, newAddresses) {
+  // newAddresses = [{label: "Maison", adresse: "Chemin..."}, ...]
+  if (!newAddresses || !Array.isArray(newAddresses)) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: "Format adresses invalide"}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName("Form Responses 1");
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({error: "Sheet non trouvé"}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  var rows = sheet.getDataRange().getValues();
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (rows[i][2] && rows[i][2].toString().toLowerCase() === email.toLowerCase()) {
+      // Mettre à jour les colonnes adresses
+      var adr1 = newAddresses[0] ? newAddresses[0].adresse : "";
+      var lab1 = newAddresses[0] ? newAddresses[0].label   : "Adresse 1";
+      var adr2 = newAddresses[1] ? newAddresses[1].adresse : "";
+      var lab2 = newAddresses[1] ? newAddresses[1].label   : "Adresse 2";
+      
+      sheet.getRange(i + 1, 4).setValue(adr1); // colonne D
+      sheet.getRange(i + 1, 5).setValue(lab1); // colonne E
+      sheet.getRange(i + 1, 6).setValue(adr2); // colonne F
+      sheet.getRange(i + 1, 7).setValue(lab2); // colonne G
+      
+      Logger.log("Adresses mises à jour pour " + email);
+      return ContentService
+        .createTextOutput(JSON.stringify({success: true, message: "Adresses mises à jour"}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+  
+  return ContentService
+    .createTextOutput(JSON.stringify({error: "Utilisateur non trouvé"}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Mise à jour de doGet pour inclure la pagination
+function doGet_v2(e) {
+  var action = e.parameter.action || "getUser";
+  var email  = e.parameter.email  || "";
+  var token  = e.parameter.token  || "";
+  var page   = e.parameter.page   || "1";
+  var limit  = e.parameter.limit  || "10";
+  
+  if (!verifyMagicToken(email, token)) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: "Token invalide", valid: false}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  if (action === "getUser") {
+    return getUserDataPaginated(email, token, page, limit);
+  } else if (action === "unsubscribe") {
+    return handleUnsubscribe(email, token);
+  }
+  
+  return ContentService
+    .createTextOutput(JSON.stringify({error: "Action inconnue"}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// doPost étendu pour updateAddresses
+function doPost_v2(e) {
+  try {
+    var payload = JSON.parse(e.postData.contents);
+    var action  = payload.action || "";
+    var email   = payload.email  || "";
+    var token   = payload.token  || "";
+    
+    // Actions qui nécessitent une authentification
+    if (action === "updateAddresses") {
+      if (!verifyMagicToken(email, token)) {
+        return ContentService.createTextOutput(JSON.stringify({error: "Token invalide"}))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      return handleUpdateAddresses(email, token, payload.addresses);
+    }
+    
+    // Actions sans token (historique existant)
+    return doPost(e);
+    
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}

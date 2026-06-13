@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Politique de confidentialité — PhémeApp</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 780px; margin: 0 auto; padding: 40px 24px; color: #333; line-height: 1.7; }
+  h1 { font-size: 28px; color: #1a3a5c; margin-bottom: 8px; }
+  h2 { font-size: 18px; color: #1a3a5c; margin-top: 40px; margin-bottom: 12px; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px; }
+  h3 { font-size: 15px; color: #333; margin-top: 24px; }
+  .date { color: #888; font-size: 14px; margin-bottom: 32px; }
+  .intro { background: #f0f4f8; border-left: 3px solid #1a3a5c; padding: 16px 20px; border-radius: 0 6px 6px 0; margin-bottom: 32px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: #1a3a5c; color: white; padding: 10px 14px; text-align: left; }
+  td { padding: 9px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #f9f9f9; }
+  ul { margin: 8px 0; padding-left: 24px; }
+  li { margin-bottom: 6px; font-size: 14px; }
+  p { font-size: 14px; }
+  .contact-box { background: #f0fdf4; border: 1px solid #1a7a4a; border-radius: 8px; padding: 18px 20px; margin-top: 32px; }
+  .contact-box h3 { margin-top: 0; color: #1a7a4a; }
+  .footer-note { font-size: 12px; color: #888; margin-top: 48px; border-top: 1px solid #e0e0e0; padding-top: 16px; }
+</style>
+</head>
+<body>
+
+<h1>Politique de confidentialité</h1>
+<p class="date">Dernière mise à jour : 13 juin 2026</p>
+
+<div class="intro">
+  PhémeApp est un service d'alerte automatisé pour les mises à l'enquête publiques du canton de Vaud (Suisse). Cette politique décrit comment nous collectons, utilisons et protégeons vos données personnelles, conformément à la <strong>Loi fédérale sur la protection des données (nLPD)</strong> en vigueur depuis le 1er septembre 2023.
+</div>
+
+<h2>1. Qui est responsable du traitement ?</h2>
+<p><strong>PhémeApp</strong><br>
+Exploité par Arnaud Mathier, indépendant<br>
+Canton de Vaud, Suisse<br>
+Contact : <a href="mailto:alerte@phemeapp.ch">alerte@phemeapp.ch</a></p>
+
+<h2>2. Quelles données collectons-nous ?</h2>
+
+<table>
+  <tr>
+    <th>Donnée</th>
+    <th>Finalité</th>
+    <th>Base légale</th>
+  </tr>
+  <tr>
+    <td>Adresse email</td>
+    <td>Envoi des alertes et communications liées au service</td>
+    <td>Consentement (inscription au formulaire)</td>
+  </tr>
+  <tr>
+    <td>Prénom et nom</td>
+    <td>Personnalisation des emails</td>
+    <td>Consentement</td>
+  </tr>
+  <tr>
+    <td>Adresse(s) postale(s)</td>
+    <td>Déterminer le périmètre de surveillance et détecter les mises à l'enquête proches</td>
+    <td>Consentement</td>
+  </tr>
+  <tr>
+    <td>Coordonnées GPS (déduites de l'adresse)</td>
+    <td>Calcul des distances par rapport aux publications CAMAC</td>
+    <td>Consentement — géocodage via api.swisstopo.ch</td>
+  </tr>
+  <tr>
+    <td>Numéro de téléphone (facultatif)</td>
+    <td>Contact en cas de problème lié au compte</td>
+    <td>Consentement</td>
+  </tr>
+  <tr>
+    <td>Profil (propriétaire / locataire)</td>
+    <td>Adapter le contenu des alertes à votre situation</td>
+    <td>Consentement</td>
+  </tr>
+  <tr>
+    <td>Historique des alertes envoyées</td>
+    <td>Affichage dans l'espace utilisateur, éviter les doublons</td>
+    <td>Intérêt légitime (bon fonctionnement du service)</td>
+  </tr>
+</table>
+
+<p><strong>Nous ne collectons pas</strong> : données de paiement, données sensibles (santé, opinions politiques, etc.), données de navigation, cookies de traçage.</p>
+
+<h2>3. Comment utilisons-nous vos données ?</h2>
+
+<ul>
+  <li>Surveiller les publications officielles de mises à l'enquête via l'API CAMAC du canton de Vaud</li>
+  <li>Vous envoyer une alerte email lorsqu'une publication est détectée dans votre périmètre</li>
+  <li>Vous envoyer des rappels si un délai d'opposition approche de son terme</li>
+  <li>Vous fournir un rapport mensuel de votre surveillance</li>
+  <li>Vous permettre de gérer votre compte via votre espace personnel (magic link)</li>
+</ul>
+
+<p><strong>Nous ne vendons jamais vos données.</strong> Nous ne les utilisons à aucune fin publicitaire ou commerciale tiers.</p>
+
+<h2>4. Avec qui partageons-nous vos données ?</h2>
+
+<table>
+  <tr>
+    <th>Sous-traitant</th>
+    <th>Rôle</th>
+    <th>Pays</th>
+  </tr>
+  <tr>
+    <td>Brevo (anciennement Sendinblue)</td>
+    <td>Routage des emails (SMTP)</td>
+    <td>France / UE</td>
+  </tr>
+  <tr>
+    <td>Google (Google Sheets, Apps Script)</td>
+    <td>Base de données utilisateurs et historique</td>
+    <td>UE (données stockées en Europe)</td>
+  </tr>
+  <tr>
+    <td>GitHub (Microsoft)</td>
+    <td>Hébergement du code et exécution automatisée (GitHub Actions)</td>
+    <td>États-Unis — sous garanties SCCs</td>
+  </tr>
+  <tr>
+    <td>api.swisstopo.ch</td>
+    <td>Géocodage des adresses postales</td>
+    <td>Suisse</td>
+  </tr>
+  <tr>
+    <td>Nominatim / OpenStreetMap</td>
+    <td>Identification de la commune depuis des coordonnées GPS</td>
+    <td>Allemagne (OSM Foundation)</td>
+  </tr>
+</table>
+
+<h2>5. Durée de conservation</h2>
+
+<p>Vos données personnelles sont conservées <strong>tant que votre compte est actif</strong>. En cas d'inactivité de plus de <strong>2 ans</strong> (aucune alerte envoyée, aucune connexion), votre compte est supprimé automatiquement.</p>
+<p>Vous pouvez à tout moment demander la suppression immédiate de vos données (voir section 7).</p>
+
+<h2>6. Sécurité</h2>
+
+<p>Nous appliquons les mesures suivantes pour protéger vos données :</p>
+<ul>
+  <li>Transmission chiffrée (HTTPS / TLS) pour tous les échanges réseau</li>
+  <li>Authentification par lien magique à usage temporaire (HMAC-SHA256, valide 30 jours)</li>
+  <li>Aucun secret d'accès stocké en clair dans le code source</li>
+  <li>Accès en écriture aux données restreint à l'Apps Script authentifié par token</li>
+  <li>Logs de fonctionnement ne contenant aucune donnée personnelle identifiable</li>
+</ul>
+
+<h2>7. Vos droits (nLPD)</h2>
+
+<p>Conformément à la loi fédérale sur la protection des données, vous disposez des droits suivants :</p>
+
+<table>
+  <tr>
+    <th>Droit</th>
+    <th>Description</th>
+    <th>Comment l'exercer</th>
+  </tr>
+  <tr>
+    <td><strong>Accès</strong></td>
+    <td>Obtenir une copie de toutes vos données</td>
+    <td>Email à alerte@phemeapp.ch</td>
+  </tr>
+  <tr>
+    <td><strong>Rectification</strong></td>
+    <td>Corriger des données inexactes</td>
+    <td>Via votre espace personnel ou par email</td>
+  </tr>
+  <tr>
+    <td><strong>Suppression</strong></td>
+    <td>Supprimer l'intégralité de vos données</td>
+    <td>Bouton "Supprimer mon compte" dans l'espace perso ou email</td>
+  </tr>
+  <tr>
+    <td><strong>Opposition</strong></td>
+    <td>Vous opposer à certains traitements</td>
+    <td>Email à alerte@phemeapp.ch</td>
+  </tr>
+  <tr>
+    <td><strong>Portabilité</strong></td>
+    <td>Recevoir vos données dans un format structuré</td>
+    <td>Email à alerte@phemeapp.ch</td>
+  </tr>
+</table>
+
+<p>Nous répondons à toute demande dans un délai de <strong>30 jours</strong>.</p>
+
+<h2>8. Cookies</h2>
+<p>PhémeApp <strong>n'utilise pas de cookies</strong>. L'espace utilisateur fonctionne via un lien magique temporaire sans session persistante ni cookie de traçage.</p>
+
+<h2>9. Modifications de cette politique</h2>
+<p>En cas de modification substantielle, vous serez informé par email avant l'entrée en vigueur des changements. La date de mise à jour est indiquée en haut de cette page.</p>
+
+<h2>10. Réclamations</h2>
+<p>Si vous estimez que le traitement de vos données viole la nLPD, vous avez le droit de déposer une réclamation auprès du <strong>Préposé fédéral à la protection des données et à la transparence (PFPDT)</strong> :<br>
+<a href="https://www.edoeb.admin.ch" target="_blank">www.edoeb.admin.ch</a></p>
+
+<div class="contact-box">
+  <h3>📩 Nous contacter</h3>
+  <p>Pour toute question relative à vos données personnelles :<br>
+  <strong>alerte@phemeapp.ch</strong><br>
+  Réponse sous 30 jours ouvrables.</p>
+</div>
+
+<div class="footer-note">
+  PhémeApp est un service d'information automatisé basé sur les données officielles du canton de Vaud (système CAMAC). Il ne remplace pas une consultation juridique.
+</div>
+
+</body>
+</html>

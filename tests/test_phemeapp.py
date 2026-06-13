@@ -396,3 +396,70 @@ def test_check_dossiers_retires_notifie_retrait():
         enquetes = []  # Dossier 42 n'est plus là
         phemeapp.check_dossiers_retires(user, notified, enquetes)
     assert len(emails_envoyes) == 1
+
+
+# ─────────────────────────────────────────────
+# TESTS IDEA-P10 : Segmentation profil
+# ─────────────────────────────────────────────
+
+def test_send_email_accepte_profil():
+    """send_email accepte un paramètre profil sans erreur."""
+    import phemeapp
+    from unittest.mock import patch
+    emails = []
+    with patch.object(phemeapp, "smtp_send", side_effect=lambda d,s,h: emails.append(h)):
+        with patch.object(phemeapp, "find_commune_enquetes_url", return_value=None):
+            enquete = {"noCamac": 1, "dateFao": 0, "lieu": "Test", "commune": "TestVille",
+                       "description": "Test", "natureTravaux": "Test", "lat": 46.5, "lng": 6.5}
+            adr = {"label": "Maison", "adresse": "Test 1 1000 Lausanne", "lat": 46.5, "lng": 6.5}
+            phemeapp.send_email("test@test.com", "Test User", enquete, adr, 200, "Locataire")
+    assert len(emails) == 1
+    assert "locataire" in emails[0].lower() or "Locataire" in emails[0]
+
+def test_send_email_message_proprietaire():
+    """Message standard pour propriétaire."""
+    import phemeapp
+    from unittest.mock import patch
+    htmls = []
+    with patch.object(phemeapp, "smtp_send", side_effect=lambda d,s,h: htmls.append(h)):
+        with patch.object(phemeapp, "find_commune_enquetes_url", return_value=None):
+            enquete = {"noCamac": 1, "dateFao": 0, "lieu": "Test", "commune": "TestVille",
+                       "description": "Test", "natureTravaux": "Test", "lat": 46.5, "lng": 6.5}
+            adr = {"label": "Maison", "adresse": "Test 1 1000 Lausanne", "lat": 46.5, "lng": 6.5}
+            phemeapp.send_email("test@test.com", "Test", enquete, adr, 200, "Propriétaire")
+    assert len(htmls) == 1
+
+# ─────────────────────────────────────────────
+# TESTS IDEA-U07 : Préférences notification
+# ─────────────────────────────────────────────
+
+def test_weekly_desactive_si_preference():
+    """Résumé hebdo non envoyé si notif_hebdo=False."""
+    import phemeapp
+    from unittest.mock import patch
+    from datetime import datetime
+    emails = []
+    # Forcer lundi
+    with patch.object(phemeapp.datetime, "now", return_value=datetime(2026, 6, 15)):  # lundi
+        with patch.object(phemeapp, "smtp_send", side_effect=lambda d,s,h: emails.append(d)):
+            user = {"email": "test@test.com", "nom": "Test",
+                    "adresses": [{"lat": 46.5, "lng": 6.5}],
+                    "notif_hebdo": False}
+            phemeapp.send_weekly_summary(user, {}, [{"noCamac": 1, "lat": 46.5, "lng": 6.5}])
+    assert len(emails) == 0
+
+def test_rappel_desactive_si_preference():
+    """Rappel J-7 non envoyé si notif_rappel=False."""
+    import phemeapp
+    from unittest.mock import patch
+    from datetime import datetime, timedelta
+    emails = []
+    with patch.object(phemeapp, "smtp_send", side_effect=lambda d,s,h: emails.append(d)):
+        user = {"email": "test@test.com", "nom": "Test",
+                "adresses": [{"lat": 46.5126, "lng": 6.5299}],
+                "notif_rappel": False}
+        ts = int((datetime.now() - timedelta(days=23)).timestamp() * 1000)
+        enquete = {"noCamac": 42, "lat": 46.5130, "lng": 6.5299, "dateFao": ts,
+                   "lieu": "Test", "commune": "TestVille", "natureTravaux": "Test"}
+        phemeapp.send_rappel_j7(user, {}, [enquete])
+    assert len(emails) == 0

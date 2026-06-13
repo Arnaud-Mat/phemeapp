@@ -6,11 +6,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read  # SEC-10: permissions minimales au niveau global
 
 jobs:
   tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # tests n'ont pas besoin d'écriture
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,6 +33,8 @@ jobs:
   run-phemeapp:
     runs-on: ubuntu-latest
     needs: tests
+    permissions:
+      contents: write  # SEC-10: write seulement pour ce job (notified.json)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -110,19 +110,51 @@
         <p style="color:#888;font-size:14px">Chargement...</p>
       </div>
       <div class="actions" style="margin-top:16px">
-        <a href="mailto:alerte@phemeapp.ch?subject=Modifier%20mes%20adresses" class="btn btn-secondary">✏️ Modifier mes adresses</a>
+        <button onclick="showEditForm()" class="btn btn-secondary">✏️ Modifier mes adresses</button>
       </div>
     </div>
 
     <!-- Historique des alertes -->
     <div class="card">
-      <h2>📬 Dernières alertes reçues</h2>
+      <h2>📬 Historique des alertes</h2>
       <div id="historique-list">
         <p style="color:#888;font-size:14px">Chargement...</p>
+      </div>
+      <div id="pagination" style="display:none;text-align:center;margin-top:16px;gap:8px;display:flex;justify-content:center">
+        <button id="btn-prev" onclick="changePage(-1)" class="btn btn-secondary" style="padding:8px 16px;font-size:13px">← Précédent</button>
+        <span id="page-info" style="line-height:2;font-size:13px;color:#888"></span>
+        <button id="btn-next" onclick="changePage(1)" class="btn btn-secondary" style="padding:8px 16px;font-size:13px">Suivant →</button>
       </div>
     </div>
 
     <!-- Paramètres -->
+    <div class="card" id="edit-adresses-card" style="display:none">
+      <h2>✏️ Modifier mes adresses</h2>
+      <div id="edit-form">
+        <div style="margin-bottom:12px">
+          <label style="font-size:13px;color:#555;display:block;margin-bottom:4px">Adresse 1 — Nom</label>
+          <input id="lab1" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box">
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:13px;color:#555;display:block;margin-bottom:4px">Adresse 1 — Adresse complète</label>
+          <input id="adr1" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box">
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:13px;color:#555;display:block;margin-bottom:4px">Adresse 2 — Nom (facultatif)</label>
+          <input id="lab2" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="font-size:13px;color:#555;display:block;margin-bottom:4px">Adresse 2 — Adresse complète (facultatif)</label>
+          <input id="adr2" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="saveAddresses()" class="btn btn-primary">Enregistrer</button>
+          <button onclick="document.getElementById('edit-adresses-card').style.display='none'" class="btn btn-secondary">Annuler</button>
+        </div>
+        <p id="save-status" style="font-size:13px;margin-top:8px"></p>
+      </div>
+    </div>
+
     <div class="card">
       <h2>⚙️ Paramètres</h2>
       <div style="display:flex;flex-direction:column;gap:12px">
@@ -280,7 +312,148 @@ async function loadUserData() {
   }
 }
 
-loadUserData();
+
+// ─── Pagination ───
+let currentPage = 1;
+const PAGE_LIMIT = 10;
+
+function changePage(delta) {
+  currentPage += delta;
+  loadUserData(currentPage);
+}
+
+// ─── Modifier adresses ───
+function showEditForm() {
+  const card = document.getElementById('edit-adresses-card');
+  card.style.display = 'block';
+  card.scrollIntoView({behavior: 'smooth'});
+  // Pré-remplir avec les adresses actuelles
+  const rows = document.querySelectorAll('#adresses-list .adresse-row');
+  if (rows[0]) {
+    document.getElementById('lab1').value = rows[0].querySelector('.adresse-label')?.textContent || '';
+    document.getElementById('adr1').value = rows[0].querySelector('.adresse-text')?.textContent || '';
+  }
+  if (rows[1]) {
+    document.getElementById('lab2').value = rows[1].querySelector('.adresse-label')?.textContent || '';
+    document.getElementById('adr2').value = rows[1].querySelector('.adresse-text')?.textContent || '';
+  }
+}
+
+async function saveAddresses() {
+  if (!WEBAPP_URL) {
+    document.getElementById('save-status').innerHTML = '<span style="color:#888">Mode démo — Apps Script non configuré.</span>';
+    return;
+  }
+  const addresses = [];
+  const adr1 = document.getElementById('adr1').value.trim();
+  const lab1 = document.getElementById('lab1').value.trim() || 'Adresse 1';
+  const adr2 = document.getElementById('adr2').value.trim();
+  const lab2 = document.getElementById('lab2').value.trim() || 'Adresse 2';
+  if (adr1) addresses.push({label: lab1, adresse: adr1});
+  if (adr2) addresses.push({label: lab2, adresse: adr2});
+  if (!addresses.length) {
+    document.getElementById('save-status').textContent = 'Veuillez saisir au moins une adresse.';
+    return;
+  }
+  document.getElementById('save-status').textContent = 'Enregistrement...';
+  try {
+    const resp = await fetch(WEBAPP_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'updateAddresses', email, token, addresses})
+    });
+    const data = await resp.json();
+    if (data.success) {
+      document.getElementById('save-status').innerHTML = '<span style="color:#1a7a4a">✅ Adresses mises à jour. Elles seront actives dès demain matin.</span>';
+      setTimeout(() => { document.getElementById('edit-adresses-card').style.display='none'; loadUserData(1); }, 2000);
+    } else {
+      document.getElementById('save-status').innerHTML = '<span style="color:#dc2626">Erreur: ' + (data.error||'inconnue') + '</span>';
+    }
+  } catch(e) {
+    document.getElementById('save-status').innerHTML = '<span style="color:#dc2626">Erreur réseau.</span>';
+  }
+}
+
+// ─── Chargement avec pagination ───
+async function loadUserData(page) {
+  page = page || 1;
+  currentPage = page;
+  if (!token || !email) { showError(); return; }
+  if (!WEBAPP_URL) {
+    showMain({
+      adresses: [
+        {label: 'Maison', adresse: 'Chemin du Grebe 12, 1028 Préverenges'},
+        {label: 'Bureau', adresse: 'Route d\'Adversan 15, 1832 Villard-sur-Chamby'}
+      ],
+      historique: Array.from({length: 12}, (_, i) => ({
+        distance_m: 200 + i*30, commune: 'Préverenges',
+        nature_travaux: 'Construction ' + (i+1),
+        date_fao: '0' + (i+1) + '.06.2026',
+        date_envoi: '2026-06-0' + (i < 9 ? i+1 : 10)
+      })),
+      pagination: {page, limit: PAGE_LIMIT, total: 12, pages: Math.ceil(12/PAGE_LIMIT)},
+      unsub_url: 'mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp'
+    });
+    return;
+  }
+  try {
+    const resp = await fetch(`${WEBAPP_URL}?action=getUser&token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}&page=${page}&limit=${PAGE_LIMIT}`);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.error || !data.valid) { showError(); return; }
+    showMain(data);
+  } catch(e) {
+    showMain({adresses: [], historique: [], pagination: null, unsub_url: null});
+  }
+}
+
+// ─── Affichage avec pagination ───
+function showMain(data) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main').style.display    = 'block';
+  document.getElementById('user-email').textContent = email || 'Non disponible';
+
+  const adressesList = document.getElementById('adresses-list');
+  if (data.adresses && data.adresses.length > 0) {
+    adressesList.innerHTML = data.adresses.map(a => `
+      <div class="adresse-row">
+        <div class="adresse-dot"></div>
+        <div class="adresse-label">${a.label || 'Adresse'}</div>
+        <div class="adresse-text">${a.adresse}</div>
+      </div>`).join('');
+  } else {
+    adressesList.innerHTML = '<p style="color:#888;font-size:14px">Aucune adresse enregistrée.</p>';
+  }
+
+  const histList = document.getElementById('historique-list');
+  if (data.historique && data.historique.length > 0) {
+    histList.innerHTML = data.historique.map(h => `
+      <div class="historique-row">
+        <span class="historique-dist">${h.distance_m}m</span>
+        <span class="historique-commune">${h.commune} — ${(h.nature_travaux||'').substring(0,50)}</span>
+        <div class="historique-date">FAO: ${h.date_fao} · Alerte: ${(h.date_envoi||'').substring(0,10)}</div>
+      </div>`).join('');
+  } else {
+    histList.innerHTML = '<p style="color:#888;font-size:14px">Aucune alerte pour le moment. Surveillance active.</p>';
+  }
+
+  // Pagination
+  const pag = data.pagination;
+  const pagDiv = document.getElementById('pagination');
+  if (pag && pag.total > pag.limit) {
+    pagDiv.style.display = 'flex';
+    document.getElementById('page-info').textContent = `Page ${pag.page} / ${pag.pages} (${pag.total} alertes)`;
+    document.getElementById('btn-prev').disabled = pag.page <= 1;
+    document.getElementById('btn-next').disabled = pag.page >= pag.pages;
+  } else {
+    pagDiv.style.display = 'none';
+  }
+
+  const unsubLink = document.getElementById('unsub-link');
+  unsubLink.href = data.unsub_url || 'mailto:alerte@phemeapp.ch?subject=D%C3%A9sinscription%20Ph%C3%A9meApp';
+}
+
+loadUserData(1);
 </script>
 </body>
 </html>

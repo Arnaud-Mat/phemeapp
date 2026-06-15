@@ -349,6 +349,8 @@ def load_notified():
     return {}
 
 def save_notified(notified):
+    notified["_version"] = "2.1"
+    notified["_last_run"] = datetime.now().isoformat()
     """
     Sauvegarde notified.json sur GitHub (si GITHUB_TOKEN disponible)
     ET localement en backup.
@@ -1781,7 +1783,10 @@ def run():
 
     save_notified(notified)
     log("=" * 50)
-    log(f"PhémeApp — terminé. {total} alerte(s) envoyée(s).")
+    log(f"PhémeApp — terminé.")
+    log(f"  Alertes envoyées    : {total}")
+    log(f"  Utilisateurs actifs : {len(users)}")
+    log(f"  Enquêtes analysées  : {len(enquetes)}")
     log("=" * 50)
 
 

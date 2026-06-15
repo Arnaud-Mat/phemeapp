@@ -780,6 +780,13 @@ def check_commune_backup(commune_name, api_count):
 APPS_SCRIPT_WEBAPP_URL = os.environ.get("APPS_SCRIPT_WEBAPP_URL", "")
 if not APPS_SCRIPT_WEBAPP_URL:
     pass  # Mode dégradé: historique Sheet désactivé, alertes email OK
+else:
+    # Vérifier que la Web App est accessible
+    try:
+        _test = requests.get(APPS_SCRIPT_WEBAPP_URL + "?action=ping", timeout=5)
+        log(f"Web App Apps Script: accessible ({_test.status_code})")
+    except Exception as _e:
+        log(f"Web App Apps Script: inaccessible ({_e})", "warning")
 
 def append_to_sheet(tab_name, row):
     """

@@ -525,3 +525,27 @@ function doPost_v2(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
+
+// ─────────────────────────────────────────────
+// SETUP — Créer le trigger sur le formulaire
+// Exécuter UNE SEULE FOIS pour lier le script au formulaire
+// ─────────────────────────────────────────────
+function createFormTrigger() {
+  // Supprimer les triggers existants sur ce formulaire pour éviter les doublons
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'onFormSubmit_withTrigger') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      Logger.log('Ancien trigger supprimé');
+    }
+  }
+  
+  // Créer le nouveau trigger lié au formulaire PhémeApp
+  ScriptApp.newTrigger('onFormSubmit_withTrigger')
+    .forForm('1UyI_rP33TaBww5WBaitEHuxKj8lTwkruZiSnHD91BEQ')
+    .onFormSubmit()
+    .create();
+  
+  Logger.log('✅ Trigger créé: onFormSubmit_withTrigger → Form PhémeApp');
+  Logger.log('Vérifiez dans Déclencheurs: événement doit être "À la soumission du formulaire"');
+}

@@ -304,7 +304,7 @@ def haversine_m(lat1, lng1, lat2, lng2):
 # ─────────────────────────────────────────────
 
 # Token GitHub pour lecture/ecriture notified.json dans le repo
-GITHUB_TOKEN   = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_TOKEN   = os.environ.get("GH_PAT", os.environ.get("GITHUB_TOKEN", ""))
 GITHUB_REPO    = os.environ.get("GITHUB_REPOSITORY", "Arnaud-Mat/phemeapp")
 NOTIFIED_PATH  = "notified.json"
 

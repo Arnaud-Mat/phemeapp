@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read  # SEC-10: permissions minimales au niveau global
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   tests:
     runs-on: ubuntu-latest

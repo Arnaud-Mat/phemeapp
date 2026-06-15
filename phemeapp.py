@@ -56,6 +56,14 @@ def esc(value):
     return _html.escape(str(value), quote=True)
 
 
+def is_valid_phone(phone):
+    """Validation format téléphone suisse (facultatif)."""
+    if not phone:
+        return True  # facultatif
+    import re as _re
+    clean = _re.sub(r'[\s\-\.()]', '', phone)
+    return bool(_re.match(r'^(\+41|0041|0)[0-9]{9}$', clean))
+
 def is_valid_email(email):
     """SEC-02: Validation format email avant tout traitement."""
     import re as _re
@@ -439,7 +447,13 @@ def smtp_send(dest, subject, html):
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"]    = f"{BREVO_SENDER_NAME} <{BREVO_SENDER}>"
-    msg["To"]      = dest
+    msg["To"]          = dest
+    # RFC 2369 + RFC 8058 : header List-Unsubscribe pour délivrabilité
+    unsub_mailto = f"mailto:{BREVO_SENDER}?subject=Unsubscribe"
+    msg["List-Unsubscribe"] = f"<{unsub_mailto}>"
+    msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+    msg["X-Mailer"]            = "PhémeApp v2.1"
+    msg["X-PhemeApp-Version"]  = "2.1"
     msg.attach(MIMEText(html, "html", "utf-8"))
     with smtplib.SMTP("smtp-relay.brevo.com", 587) as srv:
         srv.starttls()
@@ -605,9 +619,15 @@ def save_communes_cache(cache):
     with open(COMMUNES_CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(cache, f, indent=2, ensure_ascii=False)
 
+_nominatim_cache = {}  # Cache in-memory pour le run courant
+
 def get_commune_from_coords(lat, lng):
     """Trouve le nom de la commune depuis des coordonnees GPS via Nominatim.
-    IDEA-T09: délai 1s entre appels pour respecter les CGU Nominatim."""
+    IDEA-T09: délai 1s + cache in-memory pour éviter les appels redondants."""
+    # Arrondir à 2 décimales (~1km de précision) pour le cache
+    cache_key = (round(lat, 2), round(lng, 2))
+    if cache_key in _nominatim_cache:
+        return _nominatim_cache[cache_key]
     import time as _time
     _time.sleep(1)  # max 1 req/sec
     try:
@@ -1629,7 +1649,12 @@ def purge_old_notified(notified, max_days=90):
     to_delete = []
     for key, val in notified.items():
         # Garder les clés permanentes
-        if key.startswith("welcome:") or key.startswith("monthly:") or key.startswith("newsletter_zone:"):
+        # SEC-07: purger aussi les clés welcome > DATA_RETENTION_DAYS
+        if key.startswith("monthly:") or key.startswith("newsletter_zone:"):
+            continue
+        if key.startswith("welcome:"):
+            if isinstance(val, str) and val < (datetime.now() - timedelta(days=DATA_RETENTION_DAYS)).isoformat():
+                to_delete.append(key)
             continue
         # Supprimer les entrées trop anciennes
         if isinstance(val, str) and val < cutoff and not key.endswith(":ctx"):

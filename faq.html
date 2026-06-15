@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAQ — PhémeApp</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f9fafb; color: #333; }
+  nav { background: #1a3a5c; padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; }
+  .nav-logo { color: white; font-size: 20px; font-weight: 700; }
+  .nav-logo a { color: white; text-decoration: none; }
+  .hero { background: linear-gradient(135deg, #1a3a5c, #1e4a73); padding: 56px 24px; text-align: center; }
+  .hero h1 { color: white; font-size: 32px; font-weight: 700; margin-bottom: 12px; }
+  .hero p { color: #a8c4e0; font-size: 16px; }
+  .container { max-width: 760px; margin: 48px auto; padding: 0 24px 64px; }
+  .faq-section { margin-bottom: 40px; }
+  .faq-section h2 { font-size: 18px; color: #1a3a5c; font-weight: 700; margin-bottom: 20px;
+    padding-bottom: 10px; border-bottom: 2px solid #e0ebf5; }
+  .faq-item { background: white; border-radius: 10px; margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; overflow: hidden; }
+  .faq-q { padding: 18px 20px; font-size: 15px; font-weight: 600; color: #1a3a5c;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .faq-q:hover { background: #f0f4f8; }
+  .faq-a { padding: 0 20px; font-size: 14px; color: #4b5563; line-height: 1.7;
+    max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s; }
+  .faq-item.open .faq-a { max-height: 300px; padding: 0 20px 18px; }
+  .faq-item.open .faq-arrow { transform: rotate(180deg); }
+  .faq-arrow { transition: transform 0.3s; color: #9ca3af; font-size: 18px; }
+  .cta-box { background: #1a3a5c; border-radius: 12px; padding: 36px; text-align: center; margin-top: 48px; }
+  .cta-box h3 { color: white; font-size: 20px; margin-bottom: 12px; }
+  .cta-box p { color: #a8c4e0; font-size: 14px; margin-bottom: 24px; }
+  .cta-btn { background: white; color: #1a3a5c; padding: 13px 28px; border-radius: 8px;
+    font-size: 15px; font-weight: 700; text-decoration: none; display: inline-block; }
+  footer { background: #1f2937; color: #9ca3af; padding: 32px; text-align: center; font-size: 13px; }
+  footer a { color: #9ca3af; text-decoration: none; margin: 0 10px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo"><a href="/">PhémeApp</a></div>
+  <a href="/mon-compte" style="color:#a8c4e0;font-size:14px;text-decoration:none">Mon espace →</a>
+</nav>
+
+<div class="hero">
+  <h1>Questions fréquentes</h1>
+  <p>Tout ce que vous devez savoir sur PhémeApp et les mises à l'enquête</p>
+</div>
+
+<div class="container">
+
+  <div class="faq-section">
+    <h2>📋 Le service PhémeApp</h2>
+
+    <div class="faq-item open">
+      <div class="faq-q" onclick="toggle(this)">
+        Qu'est-ce qu'une mise à l'enquête publique ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        Une mise à l'enquête est une procédure officielle par laquelle une commune ou le canton informe le public qu'un projet de construction ou de travaux va avoir lieu. Elle est publiée dans la Feuille des Avis Officiels (FAO) du canton de Vaud et dans les publications communales. Pendant 30 jours, tout citoyen concerné peut consulter le dossier et déposer une opposition.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        Comment fonctionne PhémeApp ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        Chaque matin à 8h, notre système interroge automatiquement la base de données officielle des mises à l'enquête du canton de Vaud (système CAMAC). Il compare les nouvelles publications avec les adresses que vous surveillez. Si une publication est détectée dans votre périmètre, vous recevez immédiatement une alerte par email avec tous les détails et le lien vers le dossier officiel.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        Quelles communes sont couvertes ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        PhémeApp couvre l'ensemble du canton de Vaud — toutes les communes vaudoises dont les publications passent par le système CAMAC cantonal. Cela représente environ 300 à 400 publications par mois.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        PhémeApp est-il gratuit ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        Oui, la version de base est entièrement gratuite : 1 adresse surveillée, périmètre de 500m, alertes email illimitées. Une offre Pro à 9 CHF/mois permet de surveiller jusqu'à 5 adresses avec un périmètre étendu à 2km, des rappels J-7, un rapport mensuel et un espace personnel.
+      </div>
+    </div>
+  </div>
+
+  <div class="faq-section">
+    <h2>⚖️ Droits et délais</h2>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        Qui peut s'opposer à une mise à l'enquête ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        Toute personne dont les intérêts sont directement touchés par le projet peut faire opposition. Cela inclut les propriétaires riverains, les locataires, les associations de défense de l'environnement, etc. La notion d'"intérêt direct" est interprétée assez largement par les autorités vaudoises.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        Comment compter le délai de 30 jours ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        Le délai de 30 jours court dès la date de publication dans la FAO (indiquée dans chaque alerte PhémeApp). Il s'agit d'un délai de rigueur — si vous le manquez, vous perdez définitivement votre droit d'opposition pour ce projet. PhémeApp vous envoie un rappel automatique si le délai approche de son terme (rappel J-7).
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        Comment déposer une opposition ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        L'opposition doit être déposée par écrit auprès de la commune concernée (ou de la Direction compétente du canton selon le type de projet) avant l'expiration du délai. Elle doit contenir vos coordonnées, l'identification du projet contesté, et les motifs de votre opposition. Il est conseillé de consulter un avocat spécialisé en droit public pour les oppositions complexes. PhémeApp fournit le lien direct vers le dossier officiel de votre commune dans chaque alerte.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        PhémeApp remplace-t-il un conseil juridique ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        Non. PhémeApp est un service d'information automatisé qui vous alerte de l'existence d'une publication officielle. Il ne fournit aucun conseil juridique. Pour toute question relative à vos droits ou à la rédaction d'une opposition, consultez un avocat ou le service juridique de votre commune.
+      </div>
+    </div>
+  </div>
+
+  <div class="faq-section">
+    <h2>🔒 Confidentialité et données</h2>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        Quelles données collectez-vous ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        Nous collectons uniquement les données nécessaires au service : votre email, votre nom, et les adresses que vous souhaitez surveiller. Vos coordonnées GPS sont calculées automatiquement depuis votre adresse postale via l'API officielle Swisstopo. Nous ne collectons pas de données de navigation, ne plaçons pas de cookies, et ne vendons jamais vos données. Consultez notre <a href="/confidentialite" style="color:#1a3a5c">politique de confidentialité</a>.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        Comment me désinscrire ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        Vous pouvez vous désinscrire à tout moment en cliquant sur le lien "Se désinscrire" présent dans le footer de chaque email, ou depuis votre espace personnel (lien "Mon espace" dans chaque email). La suppression est immédiate et définitive.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">
+        Combien de temps conservez-vous mes données ? <span class="faq-arrow">▼</span>
+      </div>
+      <div class="faq-a">
+        Vos données sont conservées tant que votre compte est actif. En cas d'inactivité de plus de 2 ans, votre compte est supprimé automatiquement conformément à la loi fédérale sur la protection des données (nLPD). Vous pouvez demander la suppression immédiate à tout moment.
+      </div>
+    </div>
+  </div>
+
+  <div class="cta-box">
+    <h3>Encore des questions ?</h3>
+    <p>Contactez-nous directement — nous répondons sous 24h.</p>
+    <a href="mailto:alerte@phemeapp.ch" class="cta-btn">📩 alerte@phemeapp.ch</a>
+  </div>
+
+</div>
+
+<footer>
+  <p><a href="/">PhémeApp</a> · <a href="/confidentialite">Politique de confidentialité</a> · <a href="/mon-compte">Mon espace</a> · <a href="mailto:alerte@phemeapp.ch">Contact</a></p>
+  <p style="margin-top:12px">© 2026 PhémeApp — Service d'information automatisé, Canton de Vaud</p>
+</footer>
+
+<script>
+function toggle(el) {
+  const item = el.parentElement;
+  item.classList.toggle('open');
+}
+</script>
+</body>
+</html>

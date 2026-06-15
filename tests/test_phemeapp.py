@@ -610,3 +610,109 @@ def test_integration_pas_doublon_alerte():
 
     alertes = [s for s in emails if "12345" in str(s)]
     assert len(alertes) == 0, f"Doublon détecté: {alertes}"
+
+
+# ─────────────────────────────────────────────
+# Tests validation téléphone CH
+# ─────────────────────────────────────────────
+
+def test_phone_valide_suisse():
+    import phemeapp
+    assert phemeapp.is_valid_phone("+41791234567")
+    assert phemeapp.is_valid_phone("0791234567")
+    assert phemeapp.is_valid_phone("+41 79 123 45 67")
+
+def test_phone_invalide():
+    import phemeapp
+    assert not phemeapp.is_valid_phone("123")
+    assert not phemeapp.is_valid_phone("abcdef")
+    assert not phemeapp.is_valid_phone("+33612345678")  # France, pas CH
+
+def test_phone_vide_accepte():
+    import phemeapp
+    assert phemeapp.is_valid_phone("")  # facultatif
+    assert phemeapp.is_valid_phone(None)
+
+
+# ─────────────────────────────────────────────
+# Tests purge notified > 2 ans
+# ─────────────────────────────────────────────
+
+def test_purge_welcome_ancien():
+    """Clé welcome > 2 ans doit être purgée."""
+    import phemeapp
+    from datetime import datetime, timedelta
+    old_date = (datetime.now() - timedelta(days=800)).isoformat()
+    notified = {"welcome:test@test.com": old_date}
+    result = phemeapp.purge_old_notified(notified, max_days=90)
+    assert "welcome:test@test.com" not in result
+
+def test_purge_welcome_recent_garde():
+    """Clé welcome récente doit être gardée."""
+    import phemeapp
+    from datetime import datetime
+    notified = {"welcome:test@test.com": datetime.now().isoformat()}
+    result = phemeapp.purge_old_notified(notified, max_days=90)
+    assert "welcome:test@test.com" in result
+
+
+# ─────────────────────────────────────────────
+# Tests is_new_user / mark_welcome_sent
+# ─────────────────────────────────────────────
+
+def test_is_new_user_sans_welcome():
+    import phemeapp
+    assert phemeapp.is_new_user({}, "new@test.com")
+
+def test_is_new_user_avec_welcome():
+    import phemeapp
+    from datetime import datetime
+    n = {"welcome:test@test.com": datetime.now().isoformat()}
+    assert not phemeapp.is_new_user(n, "test@test.com")
+
+def test_mark_welcome_sent():
+    import phemeapp
+    n = {}
+    phemeapp.mark_welcome_sent(n, "test@test.com")
+    assert not phemeapp.is_new_user(n, "test@test.com")
+
+
+# ─────────────────────────────────────────────
+# Tests get_unsub_link + get_magic_link
+# ─────────────────────────────────────────────
+
+def test_unsub_link_format():
+    import phemeapp
+    link = phemeapp.get_unsub_link("test@test.com")
+    assert "mailto:" in link or "http" in link
+
+def test_magic_link_contient_token_et_email():
+    import phemeapp
+    link = phemeapp.get_magic_link("arnaud@test.com")
+    assert "token=" in link
+    assert "email=" in link
+    assert "arnaud" in link
+
+def test_magic_link_tokens_differents_par_email():
+    import phemeapp
+    link1 = phemeapp.get_magic_link("alice@test.com")
+    link2 = phemeapp.get_magic_link("bob@test.com")
+    assert link1 != link2
+
+
+# ─────────────────────────────────────────────
+# Tests haversine edge cases
+# ─────────────────────────────────────────────
+
+def test_haversine_valeurs_extremes():
+    """Pas d'exception sur des coords valides extrêmes."""
+    import phemeapp
+    d = phemeapp.haversine_m(0, 0, 90, 180)
+    assert d > 0
+
+def test_haversine_symetrique():
+    """Distance A→B == B→A."""
+    import phemeapp
+    d1 = phemeapp.haversine_m(46.5126, 6.5299, 46.5200, 6.5400)
+    d2 = phemeapp.haversine_m(46.5200, 6.5400, 46.5126, 6.5299)
+    assert abs(d1 - d2) < 1  # moins de 1m de différence

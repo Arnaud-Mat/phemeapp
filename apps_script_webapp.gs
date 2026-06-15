@@ -208,7 +208,7 @@ function doGet(e) {
 
 function verifyMagicToken(email, token) {
   // Vérifier pour le mois courant et le mois précédent
-  var secret = "phemeapp-magic-2026";
+  var secret = "db842af52df466861c7ce6605a760ad6ddaebf682f302a29";
   var now = new Date();
 
   for (var delta = 0; delta <= 1; delta++) {

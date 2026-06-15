@@ -80,7 +80,8 @@ def _check_required_secrets():
     if missing:
         raise EnvironmentError(f"Variables d'environnement manquantes: {', '.join(missing)}")
 
-HEALTHCHECK_URL   = os.environ.get("HEALTHCHECK_URL", "")   # IDEA-T05: https://hc-ping.com/XXXX
+HEALTHCHECK_URL   = os.environ.get("HEALTHCHECK_URL", "")
+FORM_ID           = os.environ.get("FORM_ID", "1UyI_rP33TaBww5WBaitEHuxKj8lTwkruZiSnHD91BEQ")   # IDEA-T05: https://hc-ping.com/XXXX
 ADMIN_EMAIL       = os.environ.get("ADMIN_EMAIL", "arnaud.mathier@gmail.com")
 SHEET_TAB         = "Form Responses 1"
 
@@ -775,6 +776,8 @@ def check_commune_backup(commune_name, api_count):
 # A deployer une fois via Apps Script > Deployer > Nouvelle mise en prod > Web App
 # Acces: Tout le monde, executer en tant que: moi
 APPS_SCRIPT_WEBAPP_URL = os.environ.get("APPS_SCRIPT_WEBAPP_URL", "")
+if not APPS_SCRIPT_WEBAPP_URL:
+    pass  # Mode dégradé: historique Sheet désactivé, alertes email OK
 
 def append_to_sheet(tab_name, row):
     """

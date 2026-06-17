@@ -112,7 +112,7 @@ NOTIFIED_FILE     = "notified.json"
 LOGS_DIR          = "logs"
 
 # URL fiche détaillée canton
-CAMAC_BASE_URL    = "https://prestations.vd.ch/pub/actiscamac/101091/5H1IET-7NLEK1/search"
+CAMAC_BASE_URL    = FAO_BASE_URL  # URL CAMAC inaccessible sans session — fallback FAO
 FAO_BASE_URL      = "https://www.faovd.ch/permis-de-construire/"
 
 # ─────────────────────────────────────────────
@@ -1186,7 +1186,15 @@ def send_zone_elargie_newsletter(user, notified):
         commune = z.get("commune", "--")
         nature = (z.get("nature_travaux") or "--")[:60]
         date_fao = z.get("date_fao", "--")
-        lien = z.get("lien", FAO_BASE_URL)
+        # BUG-007: utiliser site communal si disponible, sinon FAO
+        commune_z = z.get("commune", "")
+        commune_url_z = find_commune_enquetes_url(commune_z.upper()) if commune_z else None
+        lien_raw = z.get("lien", "")
+        # Si le lien stocké est une URL CAMAC (inaccessible), utiliser le site communal
+        if "actiscamac" in lien_raw or "prestations.vd.ch" in lien_raw or not lien_raw:
+            lien = commune_url_z if commune_url_z else FAO_BASE_URL
+        else:
+            lien = lien_raw
         col = "#f59e0b" if int(str(dist).replace("m","") or 2000) <= 1000 else "#888"
         rows_html += (
             f"<tr style='border-bottom:1px solid #eee'>"

@@ -112,7 +112,7 @@ NOTIFIED_FILE     = "notified.json"
 LOGS_DIR          = "logs"
 
 # URL fiche détaillée canton
-CAMAC_BASE_URL    = FAO_BASE_URL  # URL CAMAC inaccessible sans session — fallback FAO
+CAMAC_BASE_URL    = "https://www.faovd.ch/permis-de-construire"  # URL CAMAC inaccessible sans session — utilise FAO
 FAO_BASE_URL      = "https://www.faovd.ch/permis-de-construire/"
 
 # ─────────────────────────────────────────────

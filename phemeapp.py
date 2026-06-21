@@ -647,6 +647,90 @@ def get_commune_from_coords(lat, lng):
         log(f"  Reverse geocoding impossible: {e}")
         return ""
 
+def _resolve_enquete_lien(enquete: dict) -> str:
+    """
+    BUG-FAO-LINKS — Retourne le meilleur lien disponible pour un dossier CAMAC.
+    Les URLs CAMAC directes (prestations.vd.ch/...) sont éphémères et expirent
+    après quelques semaines. Stratégie de fallback :
+      1. Site communal (via find_commune_enquetes_url)
+      2. Recherche FAO filtrée par commune + mois
+      3. Page FAO générale permis de construire (toujours stable)
+    Utilisé au moment de la détection pour stocker un lien pérenne dans le Sheet.
+    """
+    commune = (enquete.get("commune") or "").strip().upper()
+    date_fao_raw = enquete.get("dateFao", 0)
+
+    # 1. Site communal — le plus précis et stable
+    if commune:
+        commune_url = find_commune_enquetes_url(commune)
+        if commune_url:
+            return commune_url
+
+    # 2. Recherche FAO par commune + mois
+    if commune and date_fao_raw:
+        try:
+            if isinstance(date_fao_raw, (int, float)) and date_fao_raw > 0:
+                dt = datetime.fromtimestamp(date_fao_raw / 1000)
+            else:
+                dt = datetime.now()
+            mois_str = dt.strftime("%Y-%m")
+            commune_enc = requests.utils.quote(commune.lower())
+            fao_search = (
+                f"https://www.fao.vd.ch/recherche"
+                f"?q={commune_enc}&rubrique=permis-de-construire&date={mois_str}"
+            )
+            return fao_search
+        except Exception:
+            pass
+
+    # 3. Fallback ultime — page FAO générale
+    return FAO_BASE_URL
+
+
+def _resolve_lien_from_row(row: dict) -> str:
+    """
+    BUG-FAO-LINKS — Résout le lien depuis une ligne du Sheet historique/zone élargie.
+    Si le lien stocké est une URL CAMAC éphémère (actiscamac / prestations.vd.ch),
+    le remplace par le site communal ou une recherche FAO stable.
+    Utilisé dans send_monthly_confirmation() et send_zone_elargie_newsletter().
+    """
+    lien_stored = row.get("lien", "")
+    commune = (row.get("commune") or "").strip().upper()
+    date_fao = row.get("date_fao", "")
+
+    # Si le lien stocké est déjà un lien communal ou FAO stable → le garder
+    if lien_stored and "actiscamac" not in lien_stored and "prestations.vd.ch" not in lien_stored:
+        return lien_stored
+
+    # Sinon : reconstruire un lien stable
+    # 1. Site communal
+    if commune:
+        commune_url = find_commune_enquetes_url(commune)
+        if commune_url:
+            return commune_url
+
+    # 2. Recherche FAO par commune + mois
+    if commune and date_fao:
+        try:
+            # date_fao format: "DD.MM.YYYY"
+            for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+                try:
+                    dt = datetime.strptime(date_fao, fmt)
+                    mois_str = dt.strftime("%Y-%m")
+                    commune_enc = requests.utils.quote(commune.lower())
+                    return (
+                        f"https://www.fao.vd.ch/recherche"
+                        f"?q={commune_enc}&rubrique=permis-de-construire&date={mois_str}"
+                    )
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+
+    # 3. Fallback
+    return FAO_BASE_URL
+
+
 def find_commune_enquetes_url(commune_name):
     """
     Cherche automatiquement la page des mises a l enquete du site communal.
@@ -838,7 +922,7 @@ def log_alerte_historique(user, adr, enquete, distance_m):
         "nature_travaux":   enquete.get("natureTravaux"),
         "distance_m":       round(distance_m),
         "date_fao":         date_fao,
-        "lien":             f"{CAMAC_BASE_URL}?noCamac={enquete.get('noCamac')}"
+        "lien":             _resolve_enquete_lien(enquete)  # BUG-FAO-LINKS: lien stable au lieu de URL CAMAC éphémère
     }
     append_to_sheet(SHEET_HISTORIQUE, row)
     log(f"  Historique alerte enregistre: CAMAC {row['no_camac']} ({row['distance_m']}m)")
@@ -862,7 +946,7 @@ def log_zone_elargie(user, adr, enquete, distance_m):
         "nature_travaux":   enquete.get("natureTravaux"),
         "distance_m":       round(distance_m),
         "date_fao":         date_fao,
-        "lien":             f"{CAMAC_BASE_URL}?noCamac={enquete.get('noCamac')}",
+        "lien":             _resolve_enquete_lien(enquete),  # BUG-FAO-LINKS: lien stable
         "inclus_newsletter": False
     }
     append_to_sheet(SHEET_ZONE, row)
@@ -992,6 +1076,7 @@ def send_monthly_confirmation(user, notified):
             f"<td style='padding:7px 8px;font-size:12px;color:#666'>{a['nature_travaux'][:50]}</td>"
             f"<td style='padding:7px 8px;font-size:12px'>{a['date_fao']}</td>"
             f"<td style='padding:7px 8px;font-size:11px;color:#888'>{a['label_adresse']}</td>"
+            f"<td style='padding:7px 8px;font-size:11px'><a href='{_resolve_lien_from_row(a)}' style='color:#1a3a5c'>Voir &#8594;</a></td>"
             f"</tr>"
         )
 
@@ -1004,6 +1089,7 @@ def send_monthly_confirmation(user, notified):
             f"<td style='padding:7px 8px'>{esc(z['commune'])}</td>"
             f"<td style='padding:7px 8px;font-size:12px;color:#666'>{z['nature_travaux'][:50]}</td>"
             f"<td style='padding:7px 8px;font-size:12px'>{z['date_fao']}</td>"
+            f"<td style='padding:7px 8px;font-size:11px'><a href='{_resolve_lien_from_row(z)}' style='color:#1a3a5c'>Voir &#8594;</a></td>"
             f"</tr>"
         )
 
@@ -1050,7 +1136,8 @@ def send_monthly_confirmation(user, notified):
             "<th style='padding:7px 8px;text-align:left'>Distance</th>"
             "<th style='padding:7px 8px;text-align:left'>Commune</th>"
             "<th style='padding:7px 8px;text-align:left'>Nature</th>"
-            "<th style='padding:7px 8px;text-align:left'>FAO</th></tr>"
+            "<th style='padding:7px 8px;text-align:left'>FAO</th>"
+            "<th style='padding:7px 8px;text-align:left'>Lien</th></tr>"
             + rows_zone + "</table>"
             "<p style='font-size:11px;color:#888;margin-top:4px'>Ces publications sont hors de votre périmètre de 500m — aucune alerte envoyée.</p>"
         )

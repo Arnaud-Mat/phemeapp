@@ -113,7 +113,7 @@ LOGS_DIR          = "logs"
 
 # URL fiche détaillée canton
 CAMAC_BASE_URL    = "https://www.faovd.ch/permis-de-construire"  # URL CAMAC inaccessible sans session — utilise FAO
-FAO_BASE_URL      = "https://www.faovd.ch/permis-de-construire/"
+FAO_BASE_URL      = "https://www.faovd.ch"  # Page d'accueil FAO (liens dossier invalides après quelques semaines)
 
 # ─────────────────────────────────────────────
 # INITIALISATION

@@ -59,6 +59,17 @@ jobs:
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: python3 phemeapp.py
+      - name: Commit notified.json
+        if: always()
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git config user.name  "PhémeApp Bot"
+          git config user.email "alerte@phemeapp.ch"
+          git add notified.json || true
+          git diff --staged --quiet || git commit -m "chore: update notified.json [skip ci]"
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git HEAD:main || true
+
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4

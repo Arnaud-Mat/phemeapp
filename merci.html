@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inscription confirmée — PhémeApp</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f0f4f8; min-height: 100vh;
+         display: flex; flex-direction: column; align-items: center; justify-content: center;
+         padding: 24px; color: #333; }
+  .card { background: white; border-radius: 16px; padding: 48px 40px; text-align: center;
+          max-width: 520px; width: 100%; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .logo { color: #1a3a5c; font-size: 22px; font-weight: 700; margin-bottom: 32px; }
+  .check { font-size: 64px; margin-bottom: 16px; }
+  h1 { font-size: 24px; color: #1a3a5c; margin-bottom: 12px; }
+  .email-badge { background: #f0f4f8; border-radius: 8px; padding: 10px 16px;
+                 font-size: 14px; color: #1a3a5c; font-weight: 600; margin: 16px 0; display: inline-block; }
+  p { font-size: 15px; color: #555; line-height: 1.7; margin-bottom: 16px; }
+  .steps { background: #f0fdf4; border-radius: 10px; padding: 20px 24px;
+           text-align: left; margin: 24px 0; }
+  .steps h3 { font-size: 14px; color: #0f4a2a; font-weight: 700; margin-bottom: 12px; }
+  .step-row { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; font-size: 14px; color: #1a5c35; }
+  .step-num { background: #1a7a4a; color: white; border-radius: 50%; width: 22px; height: 22px;
+              font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .btn { display: inline-block; background: #1a3a5c; color: white; padding: 13px 28px;
+         border-radius: 8px; font-size: 15px; font-weight: 600; text-decoration: none; margin-top: 8px; }
+  .footer { margin-top: 24px; font-size: 12px; color: #aaa; }
+  .footer a { color: #aaa; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">PhémeApp</div>
+  <div class="check">✅</div>
+  <h1>Votre surveillance est activée !</h1>
+  <div class="email-badge" id="email-display">Vérification en cours…</div>
+  <p>Un email de confirmation vient d'être envoyé à votre adresse. Vérifiez aussi vos spams.</p>
+
+  <div class="steps">
+    <h3>Ce qui se passe maintenant</h3>
+    <div class="step-row">
+      <div class="step-num">1</div>
+      <div>Vous recevez un email de bienvenue avec le récapitulatif de votre surveillance.</div>
+    </div>
+    <div class="step-row">
+      <div class="step-num">2</div>
+      <div>Chaque matin à 8h, notre système analyse toutes les nouvelles publications CAMAC du canton de Vaud.</div>
+    </div>
+    <div class="step-row">
+      <div class="step-num">3</div>
+      <div>Dès qu'une mise à l'enquête est détectée dans votre périmètre, vous recevez une alerte email immédiatement.</div>
+    </div>
+  </div>
+
+  <p style="font-size:13px;color:#888;">Délai légal d'opposition : <strong>30 jours</strong> dès la publication FAO.<br>Nous vous alertons dès J+1 au plus tard.</p>
+
+  <a href="/" class="btn">Retour à l'accueil</a>
+</div>
+
+<div class="footer">© 2026 PhémeApp — <a href="/politique-confidentialite.html">Confidentialité</a> · <a href="mailto:alerte@phemeapp.ch">Contact</a></div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const email  = params.get('email');
+const el     = document.getElementById('email-display');
+if (email) {
+  el.textContent = email;
+} else {
+  el.style.display = 'none';
+}
+</script>
+</body>
+</html>

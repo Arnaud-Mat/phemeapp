@@ -195,7 +195,9 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  if (action === "getUser") {
+  if (action === "getUserCount") {
+    return getUserCount();
+  } else if (action === "getUser") {
     return getUserData(email, token);
   } else if (action === "unsubscribe") {
     return handleUnsubscribe(email, token);
@@ -508,7 +510,9 @@ function doPost_v2(e) {
     var token   = payload.token  || "";
     
     // Actions qui nécessitent une authentification
-    if (action === "updateAddresses") {
+    if (action === "subscribe") {
+    return handleSubscribe(payload);
+  } else if (action === "updateAddresses") {
       if (!verifyMagicToken(email, token)) {
         return ContentService.createTextOutput(JSON.stringify({error: "Token invalide"}))
           .setMimeType(ContentService.MimeType.JSON);
@@ -548,4 +552,83 @@ function createFormTrigger() {
   
   Logger.log('✅ Trigger créé: onFormSubmit_withTrigger → Form PhémeApp');
   Logger.log('Vérifiez dans Déclencheurs: événement doit être "À la soumission du formulaire"');
+}
+
+
+// ── PATCH v2 : getUserCount + subscribe ─────────────────────────────────────
+
+function getUserCount() {
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName('Form Responses 1');
+  if (!sheet) return ContentService
+    .createTextOutput(JSON.stringify({count: 0}))
+    .setMimeType(ContentService.MimeType.JSON);
+
+  var data  = sheet.getDataRange().getValues();
+  var count = 0;
+  var seen  = {};
+  for (var i = 1; i < data.length; i++) {
+    var email = (data[i][2] || '').toString().trim().toLowerCase();
+    if (email && !seen[email]) { seen[email] = true; count++; }
+  }
+  return ContentService
+    .createTextOutput(JSON.stringify({count: count, max: 100, left: 100 - count}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleSubscribe(payload) {
+  var nom     = (payload.nom     || '').toString().trim();
+  var email   = (payload.email   || '').toString().trim().toLowerCase();
+  var adresse = (payload.adresse1|| '').toString().trim();
+  var label   = (payload.label1  || 'Adresse principale').toString().trim();
+
+  // Validation
+  if (!email || !adresse) {
+    return ContentService
+      .createTextOutput(JSON.stringify({success: false, error: 'Champs manquants'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(email)) {
+    return ContentService
+      .createTextOutput(JSON.stringify({success: false, error: 'Email invalide'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName('Form Responses 1');
+
+  // Vérifier doublon
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if ((data[i][2] || '').toString().trim().toLowerCase() === email) {
+      return ContentService
+        .createTextOutput(JSON.stringify({success: false, already_exists: true}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // Vérifier quota 100
+  var count = data.length - 1;
+  if (count >= 100) {
+    return ContentService
+      .createTextOutput(JSON.stringify({success: false, error: 'Liste complète (100/100)'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Ajouter la ligne
+  sheet.appendRow([
+    new Date(),   // Timestamp
+    nom,          // Nom complet
+    email,        // Email
+    adresse,      // Adresse 1
+    label,        // Label 1
+    '',           // Adresse 2
+    '',           // Label 2
+    'Oui'         // Conditions acceptées
+  ]);
+
+  return ContentService
+    .createTextOutput(JSON.stringify({success: true}))
+    .setMimeType(ContentService.MimeType.JSON);
 }

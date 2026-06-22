@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhémeApp — Alertes mises à l'enquête, Canton de Vaud</title>
+<meta name="description" content="Soyez alerté par email dès qu'une mise à l'enquête publique est déposée près de chez vous dans le canton de Vaud. Service gratuit.">
+<style>
+
+  :root {
+    --navy:   #1a3a5c;
+    --navy2:  #22466e;
+    --blue100:#e0ebf5;
+    --red:    #dc2626;
+    --redbg:  #fee2e2;
+    --orange: #f59e0b;
+    --green:  #1a7a4a;
+    --greenbg:#f0fdf4;
+    --gray900:#1f2937;
+    --gray600:#4b5563;
+    --gray400:#9ca3af;
+    --gray200:#e5e7eb;
+    --gray50: #f9fafb;
+    --white:  #ffffff;
+    --radius: 10px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray50); color: var(--gray900); }
+
+  /* ── NAV ── */
+  nav {
+    background: var(--navy);
+    padding: 0 32px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-logo { color: white; font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+  .nav-logo span { color: #7fb3d3; font-weight: 400; font-size: 13px; margin-left: 8px; }
+  .nav-links { display: flex; gap: 24px; align-items: center; }
+  .nav-links a { color: #a8c4e0; font-size: 14px; text-decoration: none; }
+  .nav-links a:hover { color: white; }
+  .nav-cta { background: white; color: var(--navy); padding: 8px 18px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
+
+  /* ── PAGES ── */
+  
+  
+
+  /* ══════════════════════════════════════
+     LANDING PAGE
+  ══════════════════════════════════════ */
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, #1e4a73 100%);
+    padding: 80px 32px 72px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 300px; height: 300px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 50%;
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.12);
+    color: #a8c4e0;
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .hero h1 {
+    color: white;
+    font-size: clamp(26px, 4vw, 44px);
+    font-weight: 700;
+    line-height: 1.2;
+    max-width: 700px;
+    margin: 0 auto 20px;
+    letter-spacing: -0.5px;
+  }
+  .hero h1 em { color: #7fb3d3; font-style: normal; }
+  .hero p {
+    color: #a8c4e0;
+    font-size: 17px;
+    max-width: 520px;
+    margin: 0 auto 36px;
+    line-height: 1.6;
+  }
+  .hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn-primary {
+    background: white;
+    color: var(--navy);
+    padding: 14px 28px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+  .btn-ghost {
+    background: transparent;
+    color: white;
+    padding: 14px 28px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid rgba(255,255,255,0.3);
+    cursor: pointer;
+  }
+  .hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 52px;
+    flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat-n { color: white; font-size: 28px; font-weight: 700; }
+  .stat-l { color: #7fb3d3; font-size: 13px; margin-top: 2px; }
+
+  /* Sections communes */
+  section { padding: 64px 24px; }
+  .container { max-width: 900px; margin: 0 auto; }
+  .section-label { color: var(--navy); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
+  .section-title { font-size: clamp(22px, 3vw, 34px); font-weight: 700; color: var(--gray900); margin-bottom: 16px; letter-spacing: -0.3px; }
+  .section-sub { font-size: 16px; color: var(--gray600); max-width: 560px; line-height: 1.6; }
+
+  /* Steps */
+  .steps { background: white; }
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 32px;
+    margin-top: 48px;
+  }
+  .step { text-align: center; padding: 0 16px; }
+  .step-num {
+    width: 48px; height: 48px;
+    background: var(--navy);
+    color: white;
+    border-radius: 50%;
+    font-size: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+  }
+  .step h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .step p { font-size: 14px; color: var(--gray600); line-height: 1.6; }
+  .step-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--gray200);
+    font-size: 28px;
+    padding-top: 24px;
+  }
+
+  /* Pourquoi */
+  .pourquoi { background: var(--gray50); }
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    margin-top: 40px;
+  }
+  .card {
+    background: white;
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--gray200);
+  }
+  .card-icon { font-size: 28px; margin-bottom: 14px; }
+  .card h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .card p { font-size: 13px; color: var(--gray600); line-height: 1.6; }
+
+  /* Alerte demo */
+  .alerte-demo { background: white; }
+  .email-mockup {
+    max-width: 540px;
+    margin: 40px auto 0;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+    overflow: hidden;
+    border: 1px solid var(--gray200);
+  }
+  .email-header-bar {
+    background: var(--navy);
+    padding: 16px 20px;
+  }
+  .email-header-bar h3 { color: white; font-size: 16px; margin: 0; }
+  .email-header-bar p { color: #a8c4e0; font-size: 11px; margin-top: 3px; }
+  .email-body { padding: 24px; }
+  .email-greeting { font-size: 15px; margin-bottom: 14px; }
+  .email-box-red {
+    background: var(--redbg);
+    border-left: 3px solid var(--red);
+    border-radius: 0 6px 6px 0;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .email-box-red strong { color: #991b1b; font-size: 14px; }
+  .email-box-red p { color: #7f1d1d; font-size: 13px; margin-top: 4px; }
+  .email-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  .email-table td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+  .email-table td:first-child { color: var(--gray400); width: 38%; }
+  .email-table td:last-child { font-weight: 500; }
+  .email-btn {
+    display: block;
+    background: var(--navy);
+    color: white;
+    text-align: center;
+    padding: 13px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    margin-bottom: 16px;
+  }
+  .countdown-badge {
+    background: var(--redbg);
+    color: #991b1b;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-block;
+    margin-bottom: 16px;
+  }
+  .email-footer-text { font-size: 11px; color: var(--gray400); border-top: 1px solid var(--gray200); padding-top: 12px; }
+
+  /* Tarifs */
+  .tarifs { background: var(--gray50); }
+  .tarifs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    max-width: 620px;
+    margin: 40px auto 0;
+  }
+  .tarif-card {
+    background: white;
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--gray200);
+  }
+  .tarif-card.featured {
+    border: 2px solid var(--navy);
+    position: relative;
+  }
+  .tarif-badge {
+    position: absolute;
+    top: -12px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--navy);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 20px;
+  }
+  .tarif-price { font-size: 36px; font-weight: 700; color: var(--navy); margin: 12px 0 4px; }
+  .tarif-price span { font-size: 15px; color: var(--gray600); font-weight: 400; }
+  .tarif-name { font-size: 18px; font-weight: 600; }
+  .tarif-features { margin-top: 20px; list-style: none; }
+  .tarif-features li { font-size: 14px; color: var(--gray600); padding: 6px 0; border-bottom: 1px solid var(--gray200); }
+  .tarif-features li::before { content: '✓  '; color: var(--green); font-weight: 700; }
+  .tarif-features li.inactive { color: var(--gray400); }
+  .tarif-features li.inactive::before { content: '—  '; color: var(--gray200); }
+  .tarif-cta {
+    display: block;
+    margin-top: 24px;
+    padding: 12px;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    background: var(--navy);
+    color: white;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+  }
+  .tarif-cta.ghost { background: transparent; border: 1px solid var(--gray200); color: var(--navy); }
+
+  /* Formulaire */
+  .formulaire { background: var(--navy); }
+  .form-card {
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 540px;
+    margin: 0 auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .form-card h2 { font-size: 22px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  .form-card p { font-size: 14px; color: var(--gray600); margin-bottom: 28px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--gray900); margin-bottom: 6px; }
+  .form-group input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid var(--gray200);
+    border-radius: 7px;
+    font-size: 14px;
+    color: var(--gray900);
+    outline: none;
+    transition: border-color 0.2s;
+    background: var(--gray50);
+  }
+  .form-group input:focus { border-color: var(--navy); background: white; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-submit {
+    width: 100%;
+    padding: 14px;
+    background: var(--navy);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .form-legal { font-size: 11px; color: var(--gray400); margin-top: 12px; text-align: center; }
+
+  /* Footer */
+  footer {
+    background: var(--gray900);
+    color: var(--gray400);
+    padding: 40px 32px;
+    text-align: center;
+  }
+  footer .footer-logo { color: white; font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+  footer p { font-size: 13px; line-height: 1.6; }
+  footer a { color: var(--gray400); text-decoration: none; margin: 0 10px; }
+  footer a:hover { color: white; }
+  .footer-links { margin: 16px 0; }
+
+  
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">PhémeApp <span>Canton de Vaud</span></div>
+  <div class="nav-links">
+    <a href="/#comment">Comment ça marche</a>
+    <a href="/#tarifs">Tarifs</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/mon-compte.html" class="nav-cta">Mon espace →</a>
+  </div>
+</nav>
+
+
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-badge">🔔 Canton de Vaud — Service gratuit</div>
+    <h1>Soyez alerté dès qu'une mise à l'enquête est publiée <em>près de chez vous</em></h1>
+    <p>Chaque matin, PhémeApp surveille les publications officielles du canton. Vous recevez une alerte par email dès qu'un projet est déposé dans votre périmètre.</p>
+    <div class="hero-btns">
+      <button class="btn-primary" onclick="document.getElementById('inscription').scrollIntoView({behavior:'smooth'})">Surveiller mon adresse — Gratuit</button>
+      <a href="#" class="btn-ghost">Comment ça marche</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-n">30j</div><div class="stat-l">Délai légal d'opposition</div></div>
+      <div class="stat"><div class="stat-n">500m</div><div class="stat-l">Périmètre de surveillance</div></div>
+      <div class="stat"><div class="stat-n">8h</div><div class="stat-l">Vérification quotidienne</div></div>
+      <div class="stat"><div class="stat-n">343</div><div class="stat-l">Publications / mois en Vaud</div></div>
+    </div>
+  </div>
+
+  <!-- Comment ça marche -->
+  <section class="steps">
+    <div class="container" style="text-align:center">
+      <div class="section-label">Simple et automatique</div>
+      <h2 class="section-title">Comment ça marche</h2>
+      <div class="steps-grid">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h3>Vous inscrivez votre adresse</h3>
+          <p>Saisissez l'adresse que vous souhaitez surveiller — domicile, bureau, propriété — et votre email.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h3>Nous surveillons chaque matin</h3>
+          <p>À 8h, PhémeApp analyse toutes les nouvelles publications CAMAC du canton de Vaud dans votre périmètre.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h3>Vous recevez une alerte</h3>
+          <p>Dès qu'une mise à l'enquête est détectée, vous recevez un email avec tous les détails et le lien officiel.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pourquoi c'est important -->
+  <section class="pourquoi">
+    <div class="container">
+      <div class="section-label">Vos droits</div>
+      <h2 class="section-title">Vous avez 30 jours pour agir</h2>
+      <p class="section-sub">Dès la publication dans la FAO, le délai légal court. Sans surveillance active, vous risquez de le manquer.</p>
+      <div class="cards-grid" style="margin-top:40px">
+        <div class="card">
+          <div class="card-icon">🏗️</div>
+          <h3>Construction d'un immeuble voisin</h3>
+          <p>Gabarit, hauteur, accès, stationnement — autant de points sur lesquels vous pouvez vous exprimer si vous êtes informé à temps.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">🛣️</div>
+          <h3>Travaux sur la route devant chez vous</h3>
+          <p>Nuisances sonores, accès modifié, modification du trottoir — les travaux publics sont aussi soumis à l'enquête.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">🌳</div>
+          <h3>Modification d'un espace vert</h3>
+          <p>Abattage d'arbres, construction d'une clôture, aménagement paysager — rien ne passe sous le radar si vous surveillez.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">⚖️</div>
+          <h3>Un droit, pas une formalité</h3>
+          <p>Propriétaires et locataires peuvent faire opposition. Le délai de 30 jours est légal et imprescriptible. Passé ce délai, plus rien n'est possible.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Email demo -->
+  <section class="alerte-demo">
+    <div class="container" style="text-align:center">
+      <div class="section-label">Aperçu</div>
+      <h2 class="section-title">Ce que vous recevez</h2>
+      <p class="section-sub" style="margin:0 auto">Une alerte claire, complète, avec le lien direct vers le dossier officiel de votre commune.</p>
+      <div class="email-mockup">
+        <div class="email-header-bar">
+          <h3>PhémeApp</h3>
+          <p>Alerte mise à l'enquête — 270m de votre adresse</p>
+        </div>
+        <div class="email-body">
+          <p class="email-greeting">Bonjour Arnaud,</p>
+          <p style="font-size:14px;color:#444;margin-bottom:14px;">Une mise à l'enquête vient d'être publiée à <strong>270m</strong> de votre adresse à <strong>Préverenges</strong>.</p>
+          <div class="email-box-red">
+            <strong>⚠️ URGENT — Il vous reste <span>7 jours</span> pour faire opposition</strong>
+            <p>Date FAO : <strong>06.06.2026</strong> — délai légal de 30 jours.</p>
+          </div>
+          <table class="email-table">
+            <tr><td>Lieu</td><td>Chemin du Grebe 8, Préverenges</td></tr>
+            <tr><td>Nature</td><td>Construction d'une villa individuelle</td></tr>
+            <tr><td>Commune</td><td>Préverenges (VD)</td></tr>
+            <tr><td>Distance</td><td style="color:#dc2626;font-weight:700">270m de votre adresse</td></tr>
+            <tr><td>Cadastre</td><td><a href="#" style="color:#1a3a5c">Voir sur geo.vd.ch →</a></td></tr>
+          </table>
+          <a href="#" class="email-btn">Consulter le dossier officiel →</a>
+          <p class="email-footer-text">PhémeApp — service d'information automatisé. Il ne remplace pas une consultation juridique. &nbsp;<a href="#" style="color:#bbb">Se désinscrire</a> · <a href="#" style="color:#1a3a5c;font-weight:500">Mon espace →</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tarifs -->
+  <section class="tarifs">
+    <div class="container" style="text-align:center">
+      <div class="section-label">Tarifs</div>
+      <h2 class="section-title">Gratuit pour commencer</h2>
+      <p class="section-sub" style="margin:0 auto">Commencez sans engagement. Passez à Pro si vous souhaitez surveiller plusieurs adresses.</p>
+      <div class="tarifs-grid">
+        <div class="tarif-card">
+          <div class="tarif-name">Gratuit</div>
+          <div class="tarif-price">0 <span>CHF / mois</span></div>
+          <ul class="tarif-features">
+            <li>1 adresse surveillée</li>
+            <li>Périmètre 500m</li>
+            <li>Alertes email</li>
+            <li>Email de bienvenue</li>
+            <li class="inactive">Rappel J-7</li>
+            <li class="inactive">Rapport mensuel</li>
+            <li class="inactive">Espace utilisateur</li>
+          </ul>
+          <button class="tarif-cta ghost" onclick="document.getElementById('inscription').scrollIntoView({behavior:'smooth'})">Commencer gratuitement</button>
+        </div>
+        <div class="tarif-card featured">
+          <div class="tarif-badge">Recommandé</div>
+          <div class="tarif-name">Pro</div>
+          <div class="tarif-price">9 <span>CHF / mois</span></div>
+          <ul class="tarif-features">
+            <li>5 adresses surveillées</li>
+            <li>Périmètre jusqu'à 2km</li>
+            <li>Alertes email prioritaires</li>
+            <li>Email de bienvenue</li>
+            <li>Rappel J-7 urgence</li>
+            <li>Rapport mensuel</li>
+            <li>Espace utilisateur</li>
+          </ul>
+          <button class="tarif-cta" onclick="document.getElementById('inscription').scrollIntoView({behavior:'smooth'})">Essayer Pro — 30j gratuits</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Formulaire -->
+  <section class="formulaire" id="inscription">
+    <div class="container">
+      <div class="form-card">
+        <h2>Activer ma surveillance</h2>
+        <p>Inscription gratuite — aucune carte bancaire requise.</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Prénom</label>
+            <input type="text" placeholder="Arnaud">
+          </div>
+          <div class="form-group">
+            <label>Nom</label>
+            <input type="text" placeholder="Mathier">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Adresse email</label>
+          <input type="email" placeholder="arnaud@exemple.ch">
+        </div>
+        <div class="form-group">
+          <label>Adresse à surveiller</label>
+          <input type="text" placeholder="Chemin du Grebe 12, 1028 Préverenges">
+        </div>
+        <div class="form-group">
+          <label>Nom de cette adresse (ex: Maison, Bureau)</label>
+          <input type="text" placeholder="Maison">
+        </div>
+        <button class="form-submit" onclick="submitForm(event)">🔔 Activer ma surveillance</button>
+        <p class="form-legal">En vous inscrivant, vous acceptez nos <a href="#" style="color:#888">CGU</a> et notre <a href="#" style="color:#888">politique de confidentialité</a>. Désabonnement en 1 clic.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-logo">PhémeApp</div>
+    <p>Service d'alerte automatisé pour les mises à l'enquête publiques vaudoises.<br>Basé sur les données officielles du canton de Vaud — CAMAC.</p>
+    <div class="footer-links">
+      <a href="/cgu.html">CGU</a>
+      <a href="/politique-confidentialite.html">Politique de confidentialité</a>
+      <a href="mailto:alerte@phemeapp.ch">Contact</a>
+      <a href="/faq.html">FAQ</a>
+    </div>
+    <p style="font-size:12px;margin-top:16px">© 2026 PhémeApp — Canton de Vaud, Suisse</p>
+  </footer>
+
+</div>
+
+</body>
+</html>
+
+<script>
+// Google Form URL — à remplacer par l'URL réelle du formulaire
+const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdmPA95DdBpJaUtvfHDA0Y_SL4Nr0ZmFCzPv-ySSW3d9Oq3kQ/viewform';
+
+function submitForm(e) {
+  e.preventDefault();
+  // Récupérer les champs
+  const prenom = document.querySelector('input[placeholder="Arnaud"]')?.value || '';
+  const nom    = document.querySelector('input[placeholder="Mathier"]')?.value || '';
+  const email  = document.querySelector('input[type="email"]')?.value || '';
+  const adresse= document.querySelector('input[placeholder="Chemin du Grebe 12, 1028 Préverenges"]')?.value || '';
+  const label  = document.querySelector('input[placeholder="Maison, Bureau"]')?.value || '';
+  
+  if (!email || !adresse) {
+    alert('Veuillez remplir au minimum l\'adresse email et l\'adresse à surveiller.');
+    return;
+  }
+  // Ouvrir le Google Form (prefill si disponible)
+  window.open(GOOGLE_FORM_URL, '_blank');
+}
+</script>

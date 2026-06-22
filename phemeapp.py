@@ -218,9 +218,9 @@ def load_users_from_sheet():
             continue
         seen_emails.add(email)
 
+        # MVP — 1 adresse max par email (plan gratuit, 100 premiers utilisateurs)
         adresses = [{"label": label1, "adresse": adr1, "lat": None, "lng": None}]
-        if adr2:
-            adresses.append({"label": label2, "adresse": adr2, "lat": None, "lng": None})
+        # adr2+ ignorées volontairement en MVP
 
         users.append({"email": email, "nom": nom, "adresses": adresses})
 

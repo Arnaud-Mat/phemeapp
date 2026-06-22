@@ -1,5 +1,5 @@
 """
-PhémeApp — v2.1
+PhémeApp — v2.2
 ====================
 Script quotidien de détection des mises à l'enquête vaudoises.
 
@@ -28,6 +28,9 @@ import io
 import json
 import math
 import os
+import re
+import hashlib
+import hmac
 import requests
 import smtplib
 from datetime import datetime, timedelta
@@ -113,7 +116,7 @@ LOGS_DIR          = "logs"
 
 # URL fiche détaillée canton
 CAMAC_BASE_URL    = "https://www.faovd.ch/permis-de-construire"  # URL CAMAC inaccessible sans session — utilise FAO
-FAO_BASE_URL      = "https://www.faovd.ch"  # Page d'accueil FAO (liens dossier invalides après quelques semaines)
+FAO_BASE_URL      = "https://www.faovd.ch/permis-de-construire/"  # BUG-FAO-BASE: URL stable permis
 
 # ─────────────────────────────────────────────
 # INITIALISATION
@@ -145,6 +148,27 @@ _logger = _setup_logger()
 def log(msg, level="info"):
     """Logging structuré — IDEA-T08."""
     getattr(_logger, level if level in ("debug","info","warning","error","critical") else "info")(msg)
+
+
+
+# ─────────────────────────────────────────────
+# SÉCURITÉ — SEC-10: sanitize, SEC-11: validation
+# ─────────────────────────────────────────────
+
+def sanitize_text(value, max_len=500):
+    """SEC-10: Sanitise une valeur texte avant inclusion dans HTML/email."""
+    if not isinstance(value, str):
+        return "—"
+    clean = re.sub(r"<[^>]+>", "", value)
+    clean = clean.replace("&", "&amp;").replace('"', "&quot;").replace("'", "&#39;")
+    return clean[:max_len] if clean.strip() else "—"
+
+
+def validate_email(email):
+    """SEC-11: Validation basique d'adresse email."""
+    if not email or not isinstance(email, str):
+        return False
+    return bool(re.match(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", email.strip()))
 
 
 # ─────────────────────────────────────────────
@@ -190,7 +214,7 @@ def load_users_from_sheet():
         adr2   = row[5].strip()
         label2 = row[6].strip() or "Adresse 2"
 
-        if not email or not adr1 or email in seen_emails:
+        if not validate_email(email) or not adr1 or email in seen_emails:  # SEC-11
             continue
         seen_emails.add(email)
 
@@ -1578,7 +1602,7 @@ def verify_magic_token(email, token):
             raw.encode("utf-8"),
             hashlib.sha256
         ).hexdigest()[:32]
-        if token == expected:
+        if hmac.compare_digest(token, expected):  # SEC-12: timing-safe
             return True
     return False
 

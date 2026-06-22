@@ -356,10 +356,79 @@
   .footer-links { margin: 16px 0; }
 
   
+
+  /* ── BANNIÈRE BÊTA ── */
+  .beta-ribbon {
+    position: fixed;
+    top: 52px;
+    right: -36px;
+    background: #f59e0b;
+    color: #1a1a1a;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 7px 48px;
+    transform: rotate(45deg);
+    z-index: 999;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* ── COMPTEUR PLACES ── */
+  .places-counter {
+    background: #fff8e1;
+    border: 1px solid #f59e0b;
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin: 0 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .places-bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .places-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #1a7a4a, #f59e0b);
+    border-radius: 4px;
+    transition: width 0.8s ease;
+  }
+  .places-text {
+    font-size: 13px;
+    color: #92400e;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .places-text span {
+    font-size: 18px;
+    color: #1a3a5c;
+    font-weight: 700;
+  }
+
+  /* ── ÉTAT FORMULAIRE ── */
+  .form-msg {
+    font-size: 13px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    display: none;
+  }
+  .form-msg.success { background: #f0fdf4; color: #1a7a4a; border: 1px solid #bbf7d0; display: block; }
+  .form-msg.error   { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; display: block; }
+  .form-msg.loading { background: #f0f4f8; color: #555; border: 1px solid #e0e0e0; display: block; }
+
 </style>
 </head>
 <body>
 
+<div class="beta-ribbon">Bêta-testeurs</div>
 <nav>
   <div class="nav-logo">PhémeApp <span>Canton de Vaud</span></div>
   <div class="nav-links">
@@ -510,31 +579,41 @@
     <div class="container">
       <div class="form-card">
         <h2>Activer ma surveillance</h2>
+        <div class="places-counter">
+          <div>
+            <div class="places-text"><span id="places-left">…</span> / 100 places</div>
+            <div style="font-size:11px;color:#92400e;margin-top:2px">Offre bêta gratuite</div>
+          </div>
+          <div class="places-bar-wrap">
+            <div class="places-bar" id="places-bar" style="width:0%"></div>
+          </div>
+        </div>
         <p>Inscription gratuite — aucune carte bancaire requise.<br><span style="font-size:12px;color:#888;">1 adresse surveillée par compte · Gratuit pour les 100 premiers</span></p>
         <div class="form-row">
           <div class="form-group">
             <label>Prénom</label>
-            <input type="text" placeholder="Arnaud">
+            <input id="f-prenom" type="text" placeholder="Arnaud" autocomplete="given-name">
           </div>
           <div class="form-group">
             <label>Nom</label>
-            <input type="text" placeholder="Mathier">
+            <input id="f-nom" type="text" placeholder="Mathier" autocomplete="family-name">
           </div>
         </div>
         <div class="form-group">
           <label>Adresse email</label>
-          <input type="email" placeholder="arnaud@exemple.ch">
+          <input id="f-email" type="email" placeholder="arnaud@exemple.ch" autocomplete="email">
         </div>
         <div class="form-group">
           <label>Adresse à surveiller</label>
-          <input type="text" placeholder="Chemin du Grebe 12, 1028 Préverenges">
+          <input id="f-adresse" type="text" placeholder="Chemin du Grebe 12, 1028 Préverenges" autocomplete="street-address">
         </div>
         <div class="form-group">
-          <label>Nom de cette adresse (ex: Maison, Bureau)</label>
-          <input type="text" placeholder="Maison">
+          <label>Nom de cette adresse <span style="color:#aaa;font-weight:400">(ex: Maison, Bureau)</span></label>
+          <input id="f-label" type="text" placeholder="Maison">
         </div>
-        <button class="form-submit" onclick="submitForm(event)">🔔 Activer ma surveillance</button>
-        <p class="form-legal">En vous inscrivant, vous acceptez nos <a href="#" style="color:#888">CGU</a> et notre <a href="#" style="color:#888">politique de confidentialité</a>. Désabonnement en 1 clic.</p>
+        <button id="f-submit" class="form-submit" onclick="submitForm(event)">🔔 Activer ma surveillance</button>
+        <div id="form-msg" class="form-msg"></div>
+        <p class="form-legal">En vous inscrivant, vous acceptez nos <a href="/cgu.html" style="color:#888">CGU</a> et notre <a href="/politique-confidentialite.html" style="color:#888">politique de confidentialité</a>. Désabonnement en 1 clic.</p>
       </div>
     </div>
   </section>
@@ -558,23 +637,87 @@
 </html>
 
 <script>
-// Google Form URL — à remplacer par l'URL réelle du formulaire
-const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdmPA95DdBpJaUtvfHDA0Y_SL4Nr0ZmFCzPv-ySSW3d9Oq3kQ/viewform';
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec';
+const MAX_USERS  = 100;
 
-function submitForm(e) {
+// ── Compteur de places ──────────────────────────────────────────────────────
+async function loadCounter() {
+  try {
+    const r    = await fetch(WEBAPP_URL + '?action=getUserCount');
+    const data = await r.json();
+    const used = data.count || 3;
+    const left = MAX_USERS - used;
+    const pct  = Math.min((used / MAX_USERS) * 100, 100);
+    document.getElementById('places-left').textContent = left + ' places restantes';
+    document.getElementById('places-bar').style.width  = pct + '%';
+  } catch(e) {
+    document.getElementById('places-left').textContent = 'places restantes';
+  }
+}
+
+// ── Soumission formulaire natif → Apps Script → Google Sheet ────────────────
+async function submitForm(e) {
   e.preventDefault();
-  // Récupérer les champs
-  const prenom = document.querySelector('input[placeholder="Arnaud"]')?.value || '';
-  const nom    = document.querySelector('input[placeholder="Mathier"]')?.value || '';
-  const email  = document.querySelector('input[type="email"]')?.value || '';
-  const adresse= document.querySelector('input[placeholder="Chemin du Grebe 12, 1028 Préverenges"]')?.value || '';
-  const label  = document.querySelector('input[placeholder="Maison, Bureau"]')?.value || '';
-  
+  const prenom  = document.getElementById('f-prenom')?.value.trim()  || '';
+  const nom     = document.getElementById('f-nom')?.value.trim()     || '';
+  const email   = document.getElementById('f-email')?.value.trim()   || '';
+  const adresse = document.getElementById('f-adresse')?.value.trim() || '';
+  const label   = document.getElementById('f-label')?.value.trim()   || 'Adresse principale';
+  const msg     = document.getElementById('form-msg');
+  const btn     = document.getElementById('f-submit');
+
   if (!email || !adresse) {
-    alert('Veuillez remplir au minimum l\'adresse email et l\'adresse à surveiller.');
+    showMsg('Veuillez remplir au minimum votre email et l'adresse à surveiller.', 'error');
     return;
   }
-  // Ouvrir le Google Form (prefill si disponible)
-  window.open(GOOGLE_FORM_URL, '_blank');
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(email)) {
+    showMsg('Adresse email invalide.', 'error');
+    return;
+  }
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ Inscription en cours…';
+  showMsg('Envoi en cours…', 'loading');
+
+  try {
+    const resp = await fetch(WEBAPP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:   'subscribe',
+        nom:      (prenom + ' ' + nom).trim(),
+        email:    email,
+        adresse1: adresse,
+        label1:   label,
+      })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      window.location.href = '/merci.html?email=' + encodeURIComponent(email);
+    } else if (data.already_exists) {
+      showMsg('✅ Cette adresse email est déjà inscrite. Consultez votre email de bienvenue.', 'success');
+      btn.disabled    = false;
+      btn.textContent = '🔔 Activer ma surveillance';
+    } else {
+      throw new Error(data.error || 'Erreur inconnue');
+    }
+  } catch(err) {
+    // Fallback : redirection Google Form
+    console.warn('Apps Script indisponible, fallback Google Form:', err);
+    window.open('https://docs.google.com/forms/d/e/1FAIpQLSdmPA95DdBpJaUtvfHDA0Y_SL4Nr0ZmFCzPv-ySSW3d9Oq3kQ/viewform', '_blank');
+    showMsg('Remplissez le formulaire qui vient de s'ouvrir pour finaliser votre inscription.', 'loading');
+    btn.disabled    = false;
+    btn.textContent = '🔔 Activer ma surveillance';
+  }
 }
+
+function showMsg(text, type) {
+  const el  = document.getElementById('form-msg');
+  el.textContent = text;
+  el.className   = 'form-msg ' + type;
+}
+
+// Lancer le compteur au chargement
+document.addEventListener('DOMContentLoaded', loadCounter);
 </script>

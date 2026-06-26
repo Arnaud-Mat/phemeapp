@@ -772,6 +772,7 @@
         <div class="form-eyebrow">Inscription gratuite</div>
         <h2>Activer ma surveillance</h2>
         <p>Aucune carte bancaire requise. Actif dès le lendemain matin.</p>
+        <div id="form-fields">
         <div class="form-row">
           <div class="form-group">
             <label>Prénom</label>
@@ -796,6 +797,18 @@
         </div>
         <div id="form-msg" style="font-size:13px;margin-bottom:8px;min-height:18px"></div>
         <button id="f-submit" class="form-submit" onclick="submitForm(event)">Activer ma surveillance →</button>
+        </div>
+
+        <!-- Message de confirmation (caché par défaut) -->
+        <div id="form-success" style="display:none;text-align:center;padding:12px 0">
+          <div style="font-size:36px;margin-bottom:16px">✅</div>
+          <h3 style="font-family:var(--font-display);font-size:22px;color:var(--sapin-dark);margin-bottom:12px">Votre surveillance est activée</h3>
+          <p id="success-msg" style="font-size:15px;color:var(--ink-70);line-height:1.7;margin-bottom:20px"></p>
+          <div style="background:var(--meadow);border-radius:var(--radius);padding:16px 20px;text-align:left">
+            <p style="font-size:13px;color:var(--sapin-dark);font-weight:600;margin-bottom:4px">📬 Un email de confirmation vous a été envoyé</p>
+            <p style="font-size:13px;color:var(--ink-70)">Vérifiez votre boîte de réception — pensez à vérifier les spams si vous ne le trouvez pas.</p>
+          </div>
+        </div>
         <p class="form-legal">En vous inscrivant, vous acceptez nos <a href="#" style="color:var(--ink-70)">CGU</a> et notre <a href="#" style="color:var(--ink-70)">politique de confidentialité</a>. Désabonnement en un clic à tout moment.</p>
       </div>
     </div>
@@ -859,7 +872,7 @@ async function submitForm(e) {
     });
     const data = await resp.json();
     if (data.success) {
-      window.location.href = '/merci.html?email=' + encodeURIComponent(email);
+      showConfirmation(adresse, email);
     } else if (data.already_exists) {
       showMsg('✅ Cette adresse email est déjà inscrite. Consultez votre email de bienvenue.', '#1a7a4a');
       btn.disabled    = false;
@@ -874,6 +887,15 @@ async function submitForm(e) {
     btn.disabled    = false;
     btn.textContent = 'Activer ma surveillance →';
   }
+}
+
+function showConfirmation(adresse, email) {
+  document.getElementById('form-fields').style.display = 'none';
+  document.getElementById('form-success').style.display = 'block';
+  const prenom = document.getElementById('f-prenom')?.value.trim() || '';
+  const greeting = prenom ? 'Merci ' + prenom + ' !' : 'Merci !';
+  document.getElementById('success-msg').innerHTML =
+    '<strong>' + greeting + '</strong> Dès demain matin à 8h, nous vous notifierons si une mise à l\'enquête est annoncée autour de <strong>' + adresse + '</strong>.';
 }
 
 function showMsg(text, color) {

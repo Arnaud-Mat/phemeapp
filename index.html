@@ -789,7 +789,8 @@
         </div>
         <div class="form-group">
           <label>Adresse à surveiller</label>
-          <input id="f-adresse" type="text" placeholder="Route du Marché 16, 1260 Nyon">
+          <input id="f-adresse" type="text" placeholder="Route du Marché 16, 1260 Nyon" oninput="debounceGeocode()" autocomplete="off">
+          <div id="geocode-status" style="margin-top:6px;font-size:12.5px;min-height:18px;display:flex;align-items:center;gap:6px"></div>
         </div>
         <div class="form-group">
           <label>Nom de cette adresse</label>
@@ -835,10 +836,129 @@
 <script>
 const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec';
 
+// ── Géocodage Swisstopo ──────────────────────────────────────────────────────
+let geocodeTimer = null;
+let geocodeValid = false;
+let geocodedLabel = '';
+
+function debounceGeocode() {
+  geocodeValid = false;
+  clearTimeout(geocodeTimer);
+  const val = document.getElementById('f-adresse').value.trim();
+  if (val.length < 8) {
+    setGeocodeStatus('', '');
+    return;
+  }
+  setGeocodeStatus('⏳', '#9ca3af', 'Vérification de l\'adresse…');
+  geocodeTimer = setTimeout(() => geocodeAddress(val), 600);
+}
+
+async function geocodeAddress(adresse) {
+  try {
+    const url = 'https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText='
+      + encodeURIComponent(adresse) + '&type=locations&sr=4326&limit=1';
+    const r    = await fetch(url);
+    const data = await r.json();
+    const results = data.results || [];
+    if (results.length > 0) {
+      const label = results[0].attrs?.label?.replace(/<[^>]+>/g, '') || adresse;
+      geocodeValid = true;
+      geocodedLabel = label;
+      setGeocodeStatus('✅', '#1a7a4a', 'Adresse trouvée : <strong>' + label + '</strong>');
+    } else {
+      geocodeValid = false;
+      setGeocodeStatus('⚠️', '#b45309', 'Adresse introuvable — vérifiez le format (ex: Route du Marché 16, 1260 Nyon)');
+    }
+  } catch(e) {
+    geocodeValid = true; // Ne pas bloquer si l'API est indisponible
+    setGeocodeStatus('', '');
+  }
+}
+
+function setGeocodeStatus(icon, color, html) {
+  const el = document.getElementById('geocode-status');
+  if (!html) { el.innerHTML = ''; return; }
+  el.innerHTML = '<span>' + icon + '</span><span style="color:' + color + '">' + html + '</span>';
+}
+
+// ── Soumission formulaire ────────────────────────────────────────────────────
 async function submitForm(e) {
   e.preventDefault();
   const prenom  = document.getElementById('f-prenom')?.value.trim()  || '';
   const nom     = document.getElementById('f-nom')?.value.trim()     || '';
+  const email   = document.getElementById('f-email')?.value.trim()   || '';
+  const adresse = document.getElementById('f-adresse')?.value.trim() || '';
+  const label   = document.getElementById('f-label')?.value.trim()   || 'Adresse principale';
+  const btn     = document.getElementById('f-submit');
+
+  if (!email || !adresse) {
+    showMsg('Veuillez remplir au minimum votre email et l\'adresse à surveiller.', '#dc2626');
+    return;
+  }
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(email)) {
+    showMsg('Adresse email invalide.', '#dc2626');
+    return;
+  }
+  if (!geocodeValid) {
+    // Lancer le géocodage si pas encore fait
+    await geocodeAddress(adresse);
+    if (!geocodeValid) {
+      showMsg('Adresse introuvable. Corrigez l\'adresse avant de continuer.', '#dc2626');
+      return;
+    }
+  }
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ Inscription en cours…';
+  showMsg('Envoi en cours…', '#9ca3af');
+
+  try {
+    const resp = await fetch(WEBAPP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:   'subscribe',
+        nom:      (prenom + ' ' + nom).trim(),
+        email:    email,
+        adresse1: adresse,
+        label1:   label,
+      })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showConfirmation(adresse, prenom);
+    } else if (data.already_exists) {
+      showMsg('✅ Cette adresse email est déjà inscrite. Consultez votre email de bienvenue.', '#1a7a4a');
+      btn.disabled    = false;
+      btn.textContent = 'Activer ma surveillance →';
+    } else {
+      throw new Error(data.error || 'Erreur inconnue');
+    }
+  } catch(err) {
+    console.warn('Apps Script indisponible, fallback Google Form:', err);
+    window.open('https://docs.google.com/forms/d/e/1FAIpQLSdmPA95DdBpJaUtvfHDA0Y_SL4Nr0ZmFCzPv-ySSW3d9Oq3kQ/viewform', '_blank');
+    showMsg('Remplissez le formulaire qui vient de s\'ouvrir pour finaliser votre inscription.', '#9ca3af');
+    btn.disabled    = false;
+    btn.textContent = 'Activer ma surveillance →';
+  }
+}
+
+function showConfirmation(adresse, prenom) {
+  document.getElementById('form-fields').style.display = 'none';
+  document.getElementById('form-success').style.display = 'block';
+  const greeting = prenom ? 'Merci ' + prenom + '\u00a0!' : 'Merci\u00a0!';
+  document.getElementById('success-msg').innerHTML =
+    '<strong>' + greeting + '</strong> Dès demain matin à 8h, nous vous notifierons si une mise à l\'enquête est annoncée autour de <strong>' + adresse + '</strong>.';
+}
+
+function showMsg(text, color) {
+  const el = document.getElementById('form-msg');
+  el.textContent = text;
+  el.style.color = color;
+}
+</script>
+</body>
   const email   = document.getElementById('f-email')?.value.trim()   || '';
   const adresse = document.getElementById('f-adresse')?.value.trim() || '';
   const label   = document.getElementById('f-label')?.value.trim()   || 'Adresse principale';

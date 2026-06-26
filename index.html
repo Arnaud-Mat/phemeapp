@@ -775,26 +775,27 @@
         <div class="form-row">
           <div class="form-group">
             <label>Prénom</label>
-            <input type="text" placeholder="Arnaud">
+            <input id="f-prenom" type="text" placeholder="Arnaud">
           </div>
           <div class="form-group">
             <label>Nom</label>
-            <input type="text" placeholder="Desbois">
+            <input id="f-nom" type="text" placeholder="Desbois">
           </div>
         </div>
         <div class="form-group">
           <label>Adresse email</label>
-          <input type="email" placeholder="arnaud.desbois@exemple.ch">
+          <input id="f-email" type="email" placeholder="arnaud.desbois@exemple.ch">
         </div>
         <div class="form-group">
           <label>Adresse à surveiller</label>
-          <input type="text" placeholder="Route du Marché 16, 1260 Nyon">
+          <input id="f-adresse" type="text" placeholder="Route du Marché 16, 1260 Nyon">
         </div>
         <div class="form-group">
           <label>Nom de cette adresse</label>
-          <input type="text" placeholder="Maison, Bureau, Immeuble…">
+          <input id="f-label" type="text" placeholder="Maison, Bureau, Immeuble…">
         </div>
-        <button class="form-submit">Activer ma surveillance →</button>
+        <div id="form-msg" style="font-size:13px;margin-bottom:8px;min-height:18px"></div>
+        <button id="f-submit" class="form-submit" onclick="submitForm(event)">Activer ma surveillance →</button>
         <p class="form-legal">En vous inscrivant, vous acceptez nos <a href="#" style="color:var(--ink-70)">CGU</a> et notre <a href="#" style="color:var(--ink-70)">politique de confidentialité</a>. Désabonnement en un clic à tout moment.</p>
       </div>
     </div>
@@ -817,6 +818,69 @@
 </div>
 
 <script>
+</script>
+<script>
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec';
+
+async function submitForm(e) {
+  e.preventDefault();
+  const prenom  = document.getElementById('f-prenom')?.value.trim()  || '';
+  const nom     = document.getElementById('f-nom')?.value.trim()     || '';
+  const email   = document.getElementById('f-email')?.value.trim()   || '';
+  const adresse = document.getElementById('f-adresse')?.value.trim() || '';
+  const label   = document.getElementById('f-label')?.value.trim()   || 'Adresse principale';
+  const btn     = document.getElementById('f-submit');
+
+  if (!email || !adresse) {
+    showMsg('Veuillez remplir au minimum votre email et l\'adresse à surveiller.', '#dc2626');
+    return;
+  }
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(email)) {
+    showMsg('Adresse email invalide.', '#dc2626');
+    return;
+  }
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ Inscription en cours…';
+  showMsg('Envoi en cours…', '#9ca3af');
+
+  try {
+    const resp = await fetch(WEBAPP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:   'subscribe',
+        nom:      (prenom + ' ' + nom).trim(),
+        email:    email,
+        adresse1: adresse,
+        label1:   label,
+      })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      window.location.href = '/merci.html?email=' + encodeURIComponent(email);
+    } else if (data.already_exists) {
+      showMsg('✅ Cette adresse email est déjà inscrite. Consultez votre email de bienvenue.', '#1a7a4a');
+      btn.disabled    = false;
+      btn.textContent = 'Activer ma surveillance →';
+    } else {
+      throw new Error(data.error || 'Erreur inconnue');
+    }
+  } catch(err) {
+    console.warn('Apps Script indisponible, fallback Google Form:', err);
+    window.open('https://docs.google.com/forms/d/e/1FAIpQLSdmPA95DdBpJaUtvfHDA0Y_SL4Nr0ZmFCzPv-ySSW3d9Oq3kQ/viewform', '_blank');
+    showMsg('Remplissez le formulaire qui vient de s\'ouvrir pour finaliser votre inscription.', '#9ca3af');
+    btn.disabled    = false;
+    btn.textContent = 'Activer ma surveillance →';
+  }
+}
+
+function showMsg(text, color) {
+  const el = document.getElementById('form-msg');
+  el.textContent = text;
+  el.style.color = color;
+}
 </script>
 </body>
 </html>

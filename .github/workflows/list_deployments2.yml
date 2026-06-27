@@ -1,0 +1,81 @@
+name: List Deployments Python
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List and test via Python
+        env:
+          CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+          SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+        run: |
+          python3 << 'PYEOF'
+          import os, json, urllib.request, urllib.parse
+
+          cid = os.environ['CLIENT_ID']
+          csec = os.environ['CLIENT_SECRET']
+          rtok = os.environ['REFRESH_TOKEN']
+          sid  = os.environ['SCRIPT_ID']
+
+          # Get access token
+          data = urllib.parse.urlencode({
+              'client_id': cid, 'client_secret': csec,
+              'refresh_token': rtok, 'grant_type': 'refresh_token'
+          }).encode()
+          req = urllib.request.Request('https://oauth2.googleapis.com/token', data=data)
+          with urllib.request.urlopen(req) as r:
+              tok = json.loads(r.read())['access_token']
+          print(f"Token OK: {tok[:20]}...")
+
+          # List deployments
+          req2 = urllib.request.Request(
+              f'https://script.googleapis.com/v1/projects/{sid}/deployments',
+              headers={'Authorization': f'Bearer {tok}'}
+          )
+          with urllib.request.urlopen(req2) as r:
+              deps = json.loads(r.read())
+
+          print(f"Deployments: {len(deps.get('deployments',[]))}")
+          urls = []
+          for dep in deps.get('deployments', []):
+              did = dep.get('deploymentId','')
+              for ep in dep.get('entryPoints', []):
+                  wa = ep.get('webApp', {})
+                  url = wa.get('url','')
+                  access = wa.get('access','')
+                  print(f"  {did[:40]} | {access} | {url[:80]}")
+                  if url: urls.append((url, access, did))
+
+          # Test POST sur chaque URL
+          for url, access, did in urls:
+              try:
+                  body = json.dumps({"action":"getUserCount"}).encode()
+                  req3 = urllib.request.Request(url, data=body,
+                      headers={'Content-Type':'application/json'}, method='POST')
+                  with urllib.request.urlopen(req3, timeout=15) as r:
+                      result = r.read().decode()[:200]
+                  print(f"POST {did[:20]} ({access}): {result}")
+              except Exception as e:
+                  print(f"POST {did[:20]} ({access}): ERROR {e}")
+
+          # Aussi tester l'URL hardcodée actuelle
+          current = "https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec"
+          try:
+              body = json.dumps({"action":"subscribe","nom":"Bot Test","email":"bot@test.ch","adresse1":"Rue de Bourg 10 1003 Lausanne","label1":"Test"}).encode()
+              req4 = urllib.request.Request(current, data=body,
+                  headers={'Content-Type':'application/json'}, method='POST')
+              with urllib.request.urlopen(req4, timeout=20) as r:
+                  result = r.read().decode()[:300]
+              print(f"POST current URL subscribe: {result}")
+          except Exception as e:
+              print(f"POST current URL: ERROR {type(e).__name__}: {e}")
+          PYEOF
+

@@ -1,0 +1,75 @@
+name: Diagnose Apps Script
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Diagnose
+        env:
+          CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+          SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, json, urllib.request, urllib.parse, sys
+
+          def annotate(msg):
+              print(f"::notice::{msg[:500]}")
+              sys.stdout.flush()
+
+          cid  = os.environ['CLIENT_ID']
+          csec = os.environ['CLIENT_SECRET']
+          rtok = os.environ['REFRESH_TOKEN']
+          sid  = os.environ['SCRIPT_ID']
+
+          # Access token
+          data = urllib.parse.urlencode({'client_id':cid,'client_secret':csec,
+              'refresh_token':rtok,'grant_type':'refresh_token'}).encode()
+          with urllib.request.urlopen(urllib.request.Request(
+              'https://oauth2.googleapis.com/token', data=data)) as r:
+              tok = json.loads(r.read())['access_token']
+          annotate(f"TOKEN_OK:{tok[:15]}")
+
+          # List deployments
+          with urllib.request.urlopen(urllib.request.Request(
+              f'https://script.googleapis.com/v1/projects/{sid}/deployments',
+              headers={'Authorization':f'Bearer {tok}'})) as r:
+              deps = json.loads(r.read())
+
+          for dep in deps.get('deployments',[]):
+              did = dep.get('deploymentId','')
+              for ep in dep.get('entryPoints',[]):
+                  wa = ep.get('webApp',{})
+                  url = wa.get('url','')
+                  access = wa.get('access','')
+                  annotate(f"DEPLOY:{did[:40]}|{access}|{url[:80]}")
+
+                  if url and 'exec' in url:
+                      try:
+                          body = json.dumps({"action":"getUserCount"}).encode()
+                          req = urllib.request.Request(url, data=body,
+                              headers={'Content-Type':'application/json'}, method='POST')
+                          with urllib.request.urlopen(req, timeout=15) as r2:
+                              result = r2.read().decode()[:200]
+                          annotate(f"POST_getUserCount_{access}:{result}")
+                      except Exception as e:
+                          annotate(f"POST_getUserCount_ERROR_{access}:{type(e).__name__}:{e}")
+
+                      try:
+                          body = json.dumps({"action":"subscribe","nom":"Bot","email":"diagnose@test123.ch",
+                              "adresse1":"Rue de Bourg 10 1003 Lausanne","label1":"Test"}).encode()
+                          req = urllib.request.Request(url, data=body,
+                              headers={'Content-Type':'application/json'}, method='POST')
+                          with urllib.request.urlopen(req, timeout=20) as r2:
+                              result = r2.read().decode()[:300]
+                          annotate(f"POST_subscribe_{access}:{result}")
+                      except Exception as e:
+                          annotate(f"POST_subscribe_ERROR_{access}:{type(e).__name__}:{str(e)[:100]}")
+          PYEOF

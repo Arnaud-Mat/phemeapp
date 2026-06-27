@@ -218,9 +218,10 @@ def load_users_from_sheet():
             continue
         seen_emails.add(email)
 
-        # MVP — 1 adresse max par email (plan gratuit, 100 premiers utilisateurs)
+        # Plan bêta — jusqu'à 2 adresses par compte
         adresses = [{"label": label1, "adresse": adr1, "lat": None, "lng": None}]
-        # adr2+ ignorées volontairement en MVP
+        if adr2:
+            adresses.append({"label": label2, "adresse": adr2, "lat": None, "lng": None})
 
         users.append({"email": email, "nom": nom, "adresses": adresses})
 
@@ -1544,8 +1545,8 @@ def handle_unsubscribe_in_sheet(email):
         return False
 
 
-MAGIC_LINK_BASE = os.environ.get("MAGIC_LINK_BASE", "https://phemeapp.ch/mon-compte")
-MAGIC_LINK_SECRET = os.environ.get("MAGIC_LINK_SECRET", "phemeapp-magic-2026")
+MAGIC_LINK_BASE = os.environ.get("MAGIC_LINK_BASE", "https://phemeapp.ch/mon-compte.html")
+MAGIC_LINK_SECRET = os.environ.get("MAGIC_LINK_SECRET", "")  # Doit être défini via GitHub Secret MAGIC_LINK_SECRET
 
 def get_tracking_pixel(email, no_camac):
     """
@@ -1583,6 +1584,9 @@ def get_magic_link(email):
     return f"{MAGIC_LINK_BASE}?token={token}&email={_quote(email)}"
 
 def verify_magic_token(email, token):
+    if not MAGIC_LINK_SECRET:
+        log("⚠️  MAGIC_LINK_SECRET non configuré — authentification désactivée", "warning")
+        return False
     """Vérifie qu'un token est valide pour cet email (mois courant ou précédent)."""
     for delta in [0, -1]:
         from datetime import date

@@ -1,0 +1,76 @@
+name: Deploy Apps Script
+
+on:
+  workflow_dispatch:  # Manuel uniquement
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Setup clasp credentials
+        run: |
+          cat > ~/.clasprc.json << CREDS
+          {
+            "tokens": {
+              "default": {
+                "client_id": "${{ secrets.CLASP_CLIENT_ID }}",
+                "client_secret": "${{ secrets.CLASP_CLIENT_SECRET }}",
+                "type": "authorized_user",
+                "refresh_token": "${{ secrets.CLASP_REFRESH_TOKEN }}"
+              }
+            }
+          }
+          CREDS
+
+      - name: Setup .clasp.json
+        run: |
+          cat > .clasp.json << CLASP
+          {
+            "scriptId": "${{ secrets.APPS_SCRIPT_ID }}",
+            "rootDir": "."
+          }
+          CLASP
+
+      - name: Rename for clasp (Code.gs)
+        run: cp apps_script_webapp.gs Code.gs
+
+      - name: Setup appsscript.json
+        run: |
+          cat > appsscript.json << META
+          {
+            "timeZone": "Europe/Zurich",
+            "dependencies": {},
+            "exceptionLogging": "STACKDRIVER",
+            "runtimeVersion": "V8",
+            "webapp": {
+              "executeAs": "USER_DEPLOYING",
+              "access": "ANYONE_ANONYMOUS"
+            }
+          }
+          META
+
+      - name: Push code to Apps Script
+        run: clasp push --force
+
+      - name: Deploy new version
+        run: |
+          clasp deploy \
+            --deploymentId "AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w" \
+            --description "Deploy $(date '+%Y-%m-%d %H:%M') via GitHub Actions"
+        
+      - name: Verify deployment
+        run: clasp deployments

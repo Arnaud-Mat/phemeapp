@@ -1,0 +1,69 @@
+name: Redeploy Apps Script Anonymous
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Setup credentials + project
+        run: |
+          cat > ~/.clasprc.json << CREDS
+          {"tokens":{"default":{"client_id":"${{ secrets.CLASP_CLIENT_ID }}","client_secret":"${{ secrets.CLASP_CLIENT_SECRET }}","type":"authorized_user","refresh_token":"${{ secrets.CLASP_REFRESH_TOKEN }}"}}}
+          CREDS
+          echo '{"scriptId":"${{ secrets.APPS_SCRIPT_ID }}","rootDir":"."}' > .clasp.json
+          cp apps_script_webapp.gs Code.gs
+          cat > appsscript.json << META
+          {"timeZone":"Europe/Zurich","dependencies":{},"exceptionLogging":"STACKDRIVER","runtimeVersion":"V8","webapp":{"executeAs":"USER_DEPLOYING","access":"ANYONE_ANONYMOUS"}}
+          META
+
+      - name: Push code
+        run: clasp push --force
+
+      - name: Get access token + redeploy via REST API
+        run: |
+          # Obtenir un access token frais
+          ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+            -d "client_id=${{ secrets.CLASP_CLIENT_ID }}&client_secret=${{ secrets.CLASP_CLIENT_SECRET }}&refresh_token=${{ secrets.CLASP_REFRESH_TOKEN }}&grant_type=refresh_token" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+          echo "Token obtenu: ${ACCESS_TOKEN:0:20}..."
+
+          SCRIPT_ID="${{ secrets.APPS_SCRIPT_ID }}"
+          DEPLOY_ID="AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w"
+
+          # Mettre à jour le déploiement existant avec access ANYONE_ANONYMOUS
+          RESULT=$(curl -s -X PUT \
+            "https://script.googleapis.com/v1/projects/${SCRIPT_ID}/deployments/${DEPLOY_ID}" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "deploymentConfig": {
+                "scriptId": "'"$SCRIPT_ID"'",
+                "versionNumber": 3,
+                "manifestFileName": "appsscript",
+                "description": "Production - ANYONE_ANONYMOUS"
+              }
+            }')
+          echo "Update result: $RESULT"
+          echo "::notice::Deploy update: $RESULT"
+
+          # Vérifier le déploiement
+          VERIFY=$(curl -s \
+            "https://script.googleapis.com/v1/projects/${SCRIPT_ID}/deployments/${DEPLOY_ID}" \
+            -H "Authorization: Bearer $ACCESS_TOKEN")
+          echo "::notice::Deployment state: $VERIFY"

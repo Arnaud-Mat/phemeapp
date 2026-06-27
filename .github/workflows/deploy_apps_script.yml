@@ -1,7 +1,7 @@
 name: Deploy Apps Script
 
 on:
-  workflow_dispatch:  # Manuel uniquement
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -23,7 +23,7 @@ jobs:
 
       - name: Setup clasp credentials
         run: |
-          cat > ~/.clasprc.json << CREDS
+          cat > ~/.clasprc.json << 'CREDS'
           {
             "tokens": {
               "default": {
@@ -35,42 +35,49 @@ jobs:
             }
           }
           CREDS
+          echo "::notice::clasprc.json créé"
 
-      - name: Setup .clasp.json
+      - name: Setup project files
         run: |
-          cat > .clasp.json << CLASP
-          {
-            "scriptId": "${{ secrets.APPS_SCRIPT_ID }}",
-            "rootDir": "."
-          }
-          CLASP
-
-      - name: Rename for clasp (Code.gs)
-        run: cp apps_script_webapp.gs Code.gs
-
-      - name: Setup appsscript.json
-        run: |
-          cat > appsscript.json << META
-          {
-            "timeZone": "Europe/Zurich",
-            "dependencies": {},
-            "exceptionLogging": "STACKDRIVER",
-            "runtimeVersion": "V8",
-            "webapp": {
-              "executeAs": "USER_DEPLOYING",
-              "access": "ANYONE_ANONYMOUS"
-            }
-          }
+          echo '{"scriptId":"${{ secrets.APPS_SCRIPT_ID }}","rootDir":"."}' > .clasp.json
+          cp apps_script_webapp.gs Code.gs
+          cat > appsscript.json << 'META'
+          {"timeZone":"Europe/Zurich","dependencies":{},"exceptionLogging":"STACKDRIVER","runtimeVersion":"V8","webapp":{"executeAs":"USER_DEPLOYING","access":"ANYONE_ANONYMOUS"}}
           META
+          echo "::notice::Fichiers projet configurés. Script ID: ${{ secrets.APPS_SCRIPT_ID }}"
+
+      - name: Clasp whoami (test auth)
+        run: |
+          set +e
+          OUTPUT=$(clasp whoami 2>&1)
+          echo "::notice::clasp whoami: $OUTPUT"
+          echo "$OUTPUT"
 
       - name: Push code to Apps Script
-        run: clasp push --force
+        run: |
+          set +e
+          OUTPUT=$(clasp push --force 2>&1)
+          EXIT=$?
+          echo "$OUTPUT"
+          echo "::notice::clasp push output: $OUTPUT"
+          if [ $EXIT -ne 0 ]; then
+            echo "::error::clasp push failed (exit $EXIT): $OUTPUT"
+            exit $EXIT
+          fi
 
       - name: Deploy new version
         run: |
-          clasp deploy \
+          set +e
+          OUTPUT=$(clasp deploy \
             --deploymentId "AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w" \
-            --description "Deploy $(date '+%Y-%m-%d %H:%M') via GitHub Actions"
-        
-      - name: Verify deployment
+            --description "Deploy $(date '+%Y-%m-%d %H:%M') via GitHub Actions" 2>&1)
+          EXIT=$?
+          echo "$OUTPUT"
+          echo "::notice::clasp deploy: $OUTPUT"
+          if [ $EXIT -ne 0 ]; then
+            echo "::error::clasp deploy failed: $OUTPUT"
+            exit $EXIT
+          fi
+
+      - name: Verify
         run: clasp deployments

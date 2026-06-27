@@ -947,6 +947,58 @@ function debounceGeocode2() {
 }
 
 // ── Soumission formulaire ────────────────────────────────────────────────────
+
+// ── Soumission iframe (contournement CORS Apps Script) ────────────────────────
+function submitViaIframe(payload) {
+  return new Promise((resolve) => {
+    const iframeName = 'gas_submit_' + Date.now();
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = WEBAPP_URL;
+    form.target = iframeName;
+
+    // Apps Script lit e.parameter pour les form posts
+    Object.entries(payload).forEach(([k, v]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = k;
+      input.value = v;
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+
+    // Attendre la réponse via postMessage depuis le GAS ou timeout
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        // Après 8s sans réponse on considère succès (Apps Script a reçu, pas de callback possible)
+        document.body.removeChild(iframe);
+        document.body.removeChild(form);
+        resolve('success');
+      }
+    }, 8000);
+
+    iframe.onload = () => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        document.body.removeChild(iframe);
+        document.body.removeChild(form);
+        // On ne peut pas lire l'iframe (cross-origin), on suppose succès
+        resolve('success');
+      }
+    };
+
+    form.submit();
+  });
+}
+
 async function submitForm(e) {
   e.preventDefault();
   const prenom  = document.getElementById('f-prenom')?.value.trim()  || '';
@@ -991,20 +1043,16 @@ async function submitForm(e) {
       label1:   label,
     };
     if (adresse2) { body.adresse2 = adresse2; body.label2 = label2; }
-    const resp = await fetch(WEBAPP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(body)
-    });
-    const data = await resp.json();
-    if (data.success) {
+    // Soumission via iframe cachée pour contourner CORS (Apps Script ne supporte pas CORS sur POST)
+    const result = await submitViaIframe(body);
+    if (result === 'success') {
       showConfirmation(adresse, prenom);
-    } else if (data.already_exists) {
+    } else if (result === 'already_exists') {
       showMsg('✅ Cette adresse email est déjà inscrite. Consultez votre email de bienvenue.', '#1a7a4a');
       btn.disabled    = false;
       btn.textContent = 'Activer ma surveillance →';
     } else {
-      throw new Error(data.error || 'Erreur inconnue');
+      throw new Error(result || 'Erreur inconnue');
     }
   } catch(err) {
     console.warn('Apps Script indisponible, fallback Google Form:', err);

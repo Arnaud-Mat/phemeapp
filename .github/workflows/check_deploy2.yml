@@ -1,0 +1,31 @@
+name: Check Apps Script Deploy Detail
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Setup credentials
+        run: |
+          cat > ~/.clasprc.json << CREDS
+          {"tokens":{"default":{"client_id":"${{ secrets.CLASP_CLIENT_ID }}","client_secret":"${{ secrets.CLASP_CLIENT_SECRET }}","type":"authorized_user","refresh_token":"${{ secrets.CLASP_REFRESH_TOKEN }}"}}}
+          CREDS
+          echo '{"scriptId":"${{ secrets.APPS_SCRIPT_ID }}","rootDir":"."}' > .clasp.json
+
+      - name: List deployments verbose
+        run: |
+          OUTPUT=$(clasp deployments 2>&1)
+          echo "$OUTPUT"
+          echo "::notice::$OUTPUT"

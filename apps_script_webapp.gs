@@ -129,6 +129,13 @@ function onFormSubmit(e) {
 function doPost(e) {
   try {
     var payload = JSON.parse(e.postData.contents);
+
+    // Router les actions du formulaire natif
+    var action = payload.action || "";
+    if (action === "subscribe") {
+      return handleSubscribe(payload);
+    }
+
     var tabName = payload.tab;
     var row     = payload.row;
 
@@ -187,6 +194,11 @@ function doGet(e) {
   var action = e.parameter.action || "";
   var email  = e.parameter.email  || "";
   var token  = e.parameter.token  || "";
+
+  // Action publique (sans token) — compteur bêta
+  if (action === "getUserCount") {
+    return getUserCount();
+  }
 
   // Vérifier le token (même logique que Python)
   if (!verifyMagicToken(email, token)) {
@@ -457,10 +469,13 @@ function handleUpdateAddresses(email, token, newAddresses) {
       var adr2 = newAddresses[1] ? newAddresses[1].adresse : "";
       var lab2 = newAddresses[1] ? newAddresses[1].label   : "Adresse 2";
       
+      // BUG-FORM-08 fix : ne pas écraser adresse2 si non fournie
       sheet.getRange(i + 1, 4).setValue(adr1); // colonne D
       sheet.getRange(i + 1, 5).setValue(lab1); // colonne E
-      sheet.getRange(i + 1, 6).setValue(adr2); // colonne F
-      sheet.getRange(i + 1, 7).setValue(lab2); // colonne G
+      if (adr2 !== "" || newAddresses.length >= 2) {
+        sheet.getRange(i + 1, 6).setValue(adr2); // colonne F — seulement si explicitement modifié
+        sheet.getRange(i + 1, 7).setValue(lab2); // colonne G
+      }
       
       Logger.log("Adresses mises à jour pour " + email);
       return ContentService
@@ -524,6 +539,117 @@ function doPost_v2(e) {
       .createTextOutput(JSON.stringify({error: err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+
+// ─────────────────────────────────────────────
+// H) FORMULAIRE NATIF — handleSubscribe
+// Gère l'inscription depuis index.html (action='subscribe')
+// BUG-FORM-02 fix : ce handler était absent
+// ─────────────────────────────────────────────
+function handleSubscribe(payload) {
+  var nom     = (payload.nom     || "").toString().trim().substring(0, 100);
+  var email   = (payload.email   || "").toString().trim().toLowerCase();
+  var adresse = (payload.adresse1|| "").toString().trim().substring(0, 200);
+  var label   = (payload.label1  || "Adresse principale").toString().trim().substring(0, 50);
+
+  // Validation basique
+  if (!email || !adresse) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: "Email ou adresse manquant"}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: "Email invalide"}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName("Form Responses 1");
+  if (!sheet) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: "Sheet non trouvé"}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Vérifier si l'email existe déjà
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][2] && rows[i][2].toString().toLowerCase() === email) {
+      return ContentService
+        .createTextOutput(JSON.stringify({already_exists: true}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // Vérifier le quota de 100 utilisateurs
+  var userCount = rows.length - 1; // sans header
+  if (userCount >= 100) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: "quota_full", message: "Les 100 places bêta sont complètes."}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Écrire dans le Sheet (colonnes B-E : nom, email, adresse1, label1)
+  var timestamp = new Date().toISOString();
+  sheet.appendRow([timestamp, nom, email, adresse, label, "", ""]);
+  Logger.log("Nouvelle inscription: " + email);
+
+  // Envoyer l'email de bienvenue
+  try {
+    var prenom = nom.split(" ")[0] || "bonjour";
+    var html = "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"
+      + "<div style='background:#1a3a5c;padding:18px 24px'>"
+      + "<h1 style='color:white;margin:0;font-size:20px'>PhémeApp</h1>"
+      + "<p style='color:#a8c4e0;margin:4px 0 0;font-size:12px'>Surveillance des mises à l'enquête — Canton de Vaud</p>"
+      + "</div><div style='padding:24px'>"
+      + "<p style='font-size:16px'>Bonjour " + prenom + ",</p>"
+      + "<p style='font-size:14px;color:#444;line-height:1.7'>Votre inscription à <strong>PhémeApp</strong> est confirmée. Votre surveillance est maintenant active.</p>"
+      + "<div style='background:#eaf4ee;border-left:3px solid #1a7a4a;padding:14px 18px;margin:20px 0;border-radius:0 6px 6px 0'>"
+      + "<p style='margin:0 0 6px;font-size:14px;color:#0f4a2a;font-weight:500'>Ce que nous faisons pour vous chaque jour</p>"
+      + "<p style='margin:0;font-size:13px;color:#1a5c35;line-height:1.7'>Chaque matin à 8h, notre système vérifie si une nouvelle mise à l'enquête a été déposée dans un rayon de <strong>500 mètres</strong> autour de votre adresse. Aucune publication ne peut nous échapper.</p>"
+      + "</div>"
+      + "<p style='font-size:14px;color:#444'>Adresse surveillée : <strong>" + label + " — " + adresse + "</strong></p>"
+      + "<div style='background:#fff8e1;border-left:3px solid #f59e0b;padding:14px 18px;margin:20px 0;border-radius:0 6px 6px 0'>"
+      + "<p style='margin:0 0 4px;font-size:13px;color:#92400e;font-weight:500'>Important — délai légal de recours</p>"
+      + "<p style='margin:0;font-size:13px;color:#92400e;line-height:1.6'>En cas de mise à l'enquête à proximité, vous disposez de <strong>30 jours</strong> à compter de la date de publication dans la FAO pour faire opposition.</p>"
+      + "</div>"
+      + "<p style='font-size:14px;color:#444'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
+      + "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;margin-top:24px'>PhémeApp est un service d'information automatisé. Il ne remplace pas une consultation juridique.</p>"
+      + "</div></body></html>";
+    MailApp.sendEmail({
+      to: email,
+      subject: "Votre surveillance PhémeApp est active",
+      htmlBody: html,
+      from: "alerte@phemeapp.ch",
+      name: "PhémeApp"
+    });
+    Logger.log("Email bienvenue envoyé à " + email);
+  } catch(mailErr) {
+    Logger.log("Erreur email bienvenue: " + mailErr.toString());
+    // Ne pas bloquer l'inscription si l'email échoue
+  }
+
+  return ContentService
+    .createTextOutput(JSON.stringify({success: true}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// getUserCount — endpoint public pour le compteur bêta dans la landing page
+// BUG-FORM-01 fix : cet endpoint était absent
+function getUserCount() {
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName("Form Responses 1");
+  if (!sheet) {
+    return ContentService
+      .createTextOutput(JSON.stringify({count: 0, max: 100}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  var count = Math.max(0, sheet.getLastRow() - 1); // sans header
+  return ContentService
+    .createTextOutput(JSON.stringify({count: count, max: 100, remaining: Math.max(0, 100 - count)}))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // ─────────────────────────────────────────────

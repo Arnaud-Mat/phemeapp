@@ -592,10 +592,10 @@
   <nav class="nav">
     <div class="nav-wordmark">PhémeApp <em>Canton de Vaud</em></div>
     <div class="nav-links">
-      <a href="#">Comment ça marche</a>
-      <a href="#">Tarifs</a>
-      <a href="#">FAQ</a>
-      <a href="#" class="nav-cta">Mon espace →</a>
+      <a href="#comment-ca-marche">Comment ça marche</a>
+      <a href="#tarifs">Tarifs</a>
+      <a href="/faq.html">FAQ</a>
+      <a href="/mon-compte.html" class="nav-cta">Mon espace →</a>
     </div>
   </nav>
 
@@ -772,6 +772,15 @@
         <div class="form-eyebrow">Inscription gratuite</div>
         <h2>Activer ma surveillance</h2>
         <p>Aucune carte bancaire requise. Actif dès le lendemain matin.</p>
+        <div id="beta-counter" style="background:#f0f4f8;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#1a3a5c;display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span>🎉 Places bêta restantes</span>
+            <strong id="beta-remaining">—</strong>
+          </div>
+          <div style="background:#e0ebf5;border-radius:4px;height:6px;overflow:hidden">
+            <div id="beta-bar" style="background:#1a3a5c;height:100%;width:0%;transition:width 0.4s"></div>
+          </div>
+        </div>
         <div id="form-fields">
         <div class="form-row">
           <div class="form-group">
@@ -785,11 +794,11 @@
         </div>
         <div class="form-group">
           <label>Adresse email</label>
-          <input id="f-email" type="email" placeholder="arnaud.desbois@exemple.ch">
+          <input id="f-email" type="email" placeholder="arnaud.desbois@exemple.ch" required>
         </div>
         <div class="form-group">
           <label>Adresse à surveiller</label>
-          <input id="f-adresse" type="text" placeholder="Route du Marché 16, 1260 Nyon" oninput="debounceGeocode()" autocomplete="off">
+          <input id="f-adresse" type="text" placeholder="Route du Marché 16, 1260 Nyon" oninput="debounceGeocode()" autocomplete="off" required>
           <div id="geocode-status" style="margin-top:6px;font-size:12.5px;min-height:18px;display:flex;align-items:center;gap:6px"></div>
         </div>
         <div class="form-group">
@@ -810,7 +819,7 @@
             <p style="font-size:13px;color:var(--ink-70)">Vérifiez votre boîte de réception — pensez à vérifier les spams si vous ne le trouvez pas.</p>
           </div>
         </div>
-        <p class="form-legal">En vous inscrivant, vous acceptez nos <a href="#" style="color:var(--ink-70)">CGU</a> et notre <a href="#" style="color:var(--ink-70)">politique de confidentialité</a>. Désabonnement en un clic à tout moment.</p>
+        <p class="form-legal">En vous inscrivant, vous acceptez notre <a href="/politique-confidentialite.html" style="color:var(--ink-70)">politique de confidentialité</a>. Désabonnement en un clic à tout moment.</p>
       </div>
     </div>
   </section>
@@ -821,10 +830,9 @@
     <p style="max-width:460px;margin:0 auto">Service d'alerte automatisé pour les mises à l'enquête publiques du canton de Vaud. Basé sur les données officielles CAMAC.</p>
     <div class="footer-sep"></div>
     <p>
-      <a href="#">CGU</a>
-      <a href="#">Confidentialité</a>
-      <a href="#">FAQ</a>
-      <a href="#">Contact</a>
+      <a href="/politique-confidentialite.html">CGU & Confidentialité</a>
+      <a href="/faq.html">FAQ</a>
+      <a href="mailto:alerte@phemeapp.ch">Contact</a>
     </p>
     <p style="margin-top:14px;font-size:12px">© 2026 PhémeApp — Canton de Vaud, Suisse</p>
   </footer>
@@ -861,10 +869,20 @@ async function geocodeAddress(adresse) {
     const data = await r.json();
     const results = data.results || [];
     if (results.length > 0) {
-      const label = results[0].attrs?.label?.replace(/<[^>]+>/g, '') || adresse;
+      const attrs = results[0].attrs || {};
+      const label = (attrs.label || adresse).replace(/<[^>]+>/g, '');
+      const canton = (attrs.origin || attrs.layerBodId || '').toLowerCase();
       geocodeValid = true;
       geocodedLabel = label;
-      setGeocodeStatus('✅', '#1a7a4a', 'Adresse trouvée : <strong>' + label + '</strong>');
+      // Avertir si hors canton de Vaud
+      const isVaud = label.toLowerCase().includes('vaud') || label.toLowerCase().includes(' vd') ||
+                     canton.includes('vd') ||
+                     (attrs.lon && attrs.lon > 6.1 && attrs.lon < 7.2 && attrs.lat > 46.3 && attrs.lat < 47.0);
+      if (!isVaud) {
+        setGeocodeStatus('⚠️', '#b45309', 'Adresse trouvée hors canton de Vaud : <strong>' + label + '</strong>. PhémeApp surveille uniquement le canton de Vaud.');
+      } else {
+        setGeocodeStatus('✅', '#1a7a4a', 'Adresse trouvée : <strong>' + label + '</strong>');
+      }
     } else {
       geocodeValid = false;
       setGeocodeStatus('⚠️', '#b45309', 'Adresse introuvable — vérifiez le format (ex: Route du Marché 16, 1260 Nyon)');
@@ -948,8 +966,12 @@ function showConfirmation(adresse, prenom) {
   document.getElementById('form-fields').style.display = 'none';
   document.getElementById('form-success').style.display = 'block';
   const greeting = prenom ? 'Merci ' + prenom + '\u00a0!' : 'Merci\u00a0!';
-  document.getElementById('success-msg').innerHTML =
-    '<strong>' + greeting + '</strong> Dès demain matin à 8h, nous vous notifierons si une mise à l\'enquête est annoncée autour de <strong>' + adresse + '</strong>.';
+  const msg = document.getElementById('success-msg');
+  msg.innerHTML = '<strong>' + greeting + '</strong> Dès demain matin à 8h, nous vous notifierons si une mise à l\'enquête est annoncée autour de ';
+  const adresseSpan = document.createElement('strong');
+  adresseSpan.textContent = adresse;
+  msg.appendChild(adresseSpan);
+  msg.appendChild(document.createTextNode('.'));
 }
 
 function showMsg(text, color) {
@@ -957,6 +979,22 @@ function showMsg(text, color) {
   el.textContent = text;
   el.style.color = color;
 }
+
+// ── Compteur bêta (BUG-FORM-01 fix) ─────────────────────────────────────────
+async function loadBetaCounter() {
+  try {
+    const r = await fetch(WEBAPP_URL + '?action=getUserCount');
+    const d = await r.json();
+    if (typeof d.count === 'number') {
+      const remaining = Math.max(0, 100 - d.count);
+      const pct = Math.min(100, (d.count / 100) * 100);
+      document.getElementById('beta-remaining').textContent = remaining + ' / 100';
+      document.getElementById('beta-bar').style.width = pct + '%';
+      document.getElementById('beta-counter').style.display = 'block';
+    }
+  } catch(e) { /* silencieux si Apps Script indisponible */ }
+}
+document.addEventListener('DOMContentLoaded', loadBetaCounter);
 </script>
 </body>
   const email   = document.getElementById('f-email')?.value.trim()   || '';
@@ -1014,8 +1052,12 @@ function showConfirmation(adresse, email) {
   document.getElementById('form-success').style.display = 'block';
   const prenom = document.getElementById('f-prenom')?.value.trim() || '';
   const greeting = prenom ? 'Merci ' + prenom + ' !' : 'Merci !';
-  document.getElementById('success-msg').innerHTML =
-    '<strong>' + greeting + '</strong> Dès demain matin à 8h, nous vous notifierons si une mise à l\'enquête est annoncée autour de <strong>' + adresse + '</strong>.';
+  const msg = document.getElementById('success-msg');
+  msg.innerHTML = '<strong>' + greeting + '</strong> Dès demain matin à 8h, nous vous notifierons si une mise à l\'enquête est annoncée autour de ';
+  const adresseSpan = document.createElement('strong');
+  adresseSpan.textContent = adresse;
+  msg.appendChild(adresseSpan);
+  msg.appendChild(document.createTextNode('.'));
 }
 
 function showMsg(text, color) {
@@ -1023,6 +1065,22 @@ function showMsg(text, color) {
   el.textContent = text;
   el.style.color = color;
 }
+
+// ── Compteur bêta (BUG-FORM-01 fix) ─────────────────────────────────────────
+async function loadBetaCounter() {
+  try {
+    const r = await fetch(WEBAPP_URL + '?action=getUserCount');
+    const d = await r.json();
+    if (typeof d.count === 'number') {
+      const remaining = Math.max(0, 100 - d.count);
+      const pct = Math.min(100, (d.count / 100) * 100);
+      document.getElementById('beta-remaining').textContent = remaining + ' / 100';
+      document.getElementById('beta-bar').style.width = pct + '%';
+      document.getElementById('beta-counter').style.display = 'block';
+    }
+  } catch(e) { /* silencieux si Apps Script indisponible */ }
+}
+document.addEventListener('DOMContentLoaded', loadBetaCounter);
 </script>
 </body>
 </html>

@@ -3,7 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PhémeApp — Aperçu redesign</title>
+<meta name="description" content="PhémeApp surveille les mises à l'enquête publiques du canton de Vaud. Recevez une alerte email dès qu'un projet est déposé dans votre périmètre. Gratuit pour les 100 premiers bêta-testeurs.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://phemeapp.ch/">
+<meta property="og:title" content="PhémeApp — Alertes mises à l'enquête, Canton de Vaud">
+<meta property="og:description" content="Soyez alerté dès qu'une mise à l'enquête est publiée près de chez vous. Service gratuit, canton de Vaud.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="PhémeApp — Alertes mises à l'enquête">
+<meta name="twitter:description" content="Surveillance automatique des mises à l'enquête vaudoises. Gratuit.">
+<link rel="canonical" href="https://phemeapp.ch/">
+<title>PhémeApp — Alertes mises à l'enquête, Canton de Vaud</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -610,7 +619,7 @@
       <p>Chaque matin, PhémeApp surveille les publications officielles du canton de Vaud et vous alerte dès qu'un dossier est déposé dans votre périmètre.</p>
       <div class="hero-btns">
         <button class="btn-hero" onclick="document.getElementById('inscription').scrollIntoView({behavior:'smooth'})">Activer ma surveillance — gratuit</button>
-        <a href="#" class="btn-ghost-hero">Comment ça marche</a>
+        <a href="#comment-ca-marche" class="btn-ghost-hero">Comment ça marche</a>
       </div>
       <div class="hero-stats">
         <div class="stat">
@@ -634,7 +643,7 @@
   </div>
 
   <!-- HOW IT WORKS -->
-  <section class="steps-section">
+  <section class="steps-section" id="comment-ca-marche">
     <div class="section-inner">
       <div class="section-eyebrow">Processus</div>
       <h2 class="section-title">Simple, automatique, fiable</h2>
@@ -715,16 +724,16 @@
             <tr><td>Distance</td><td style="color:var(--alert-red);font-weight:700">270 m de votre adresse</td></tr>
           </table>
           <div class="email-btn-wrap">
-            <a href="#" class="email-btn">Consulter le dossier →</a>
+            <a href="https://www.faovd.ch/permis-de-construire/" class="email-btn" target="_blank" rel="noopener">Consulter le dossier →</a>
           </div>
-          <p class="email-fine">PhémeApp — service d'information automatisé, canton de Vaud. &nbsp;<a href="#" style="color:var(--ink-40)">Se désinscrire</a> · <a href="#" style="color:var(--sapin)">Mon espace</a></p>
+          <p class="email-fine">PhémeApp — service d'information automatisé, canton de Vaud. &nbsp;<span style="color:var(--ink-40)">Se désinscrire</span> · <a href="/mon-compte.html" style="color:var(--sapin)">Mon espace</a></p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- PRICING -->
-  <section class="pricing-section">
+  <section class="pricing-section" id="tarifs">
     <div class="section-inner" style="text-align:center">
       <div class="section-eyebrow" style="justify-content:center">Tarifs</div>
       <h2 class="section-title">Gratuit pour commencer</h2>
@@ -805,6 +814,20 @@
           <label>Nom de cette adresse</label>
           <input id="f-label" type="text" placeholder="Maison, Bureau, Immeuble…">
         </div>
+        <details style="margin-bottom:12px">
+          <summary style="font-size:13px;color:var(--sapin);cursor:pointer;font-weight:600;padding:4px 0">+ Ajouter une 2ème adresse à surveiller</summary>
+          <div style="margin-top:12px">
+            <div class="form-group">
+              <label>2ème adresse à surveiller</label>
+              <input id="f-adresse2" type="text" placeholder="Avenue de la Gare 5, 1003 Lausanne" oninput="debounceGeocode2()" autocomplete="off">
+              <div id="geocode-status2" style="margin-top:6px;font-size:12.5px;min-height:18px;display:flex;align-items:center;gap:6px"></div>
+            </div>
+            <div class="form-group">
+              <label>Nom de cette 2ème adresse</label>
+              <input id="f-label2" type="text" placeholder="Bureau, Parents, Investissement…">
+            </div>
+          </div>
+        </details>
         <div id="form-msg" style="font-size:13px;margin-bottom:8px;min-height:18px"></div>
         <button id="f-submit" class="form-submit" onclick="submitForm(event)">Activer ma surveillance →</button>
         </div>
@@ -899,6 +922,30 @@ function setGeocodeStatus(icon, color, html) {
   el.innerHTML = '<span>' + icon + '</span><span style="color:' + color + '">' + html + '</span>';
 }
 
+// Géocodage 2ème adresse (BUG-FORM-07)
+let geocodeTimer2 = null;
+function debounceGeocode2() {
+  clearTimeout(geocodeTimer2);
+  const val = document.getElementById('f-adresse2').value.trim();
+  const el2 = document.getElementById('geocode-status2');
+  if (val.length < 8) { el2.innerHTML = ''; return; }
+  el2.innerHTML = '<span>⏳</span><span style="color:#9ca3af">Vérification…</span>';
+  geocodeTimer2 = setTimeout(async () => {
+    try {
+      const r = await fetch('https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText='
+        + encodeURIComponent(val) + '&type=locations&sr=4326&limit=1');
+      const data = await r.json();
+      const results = data.results || [];
+      if (results.length > 0) {
+        const lbl = (results[0].attrs?.label || val).replace(/<[^>]+>/g, '');
+        el2.innerHTML = '<span>✅</span><span style="color:#1a7a4a">Adresse trouvée : <strong>' + lbl + '</strong></span>';
+      } else {
+        el2.innerHTML = '<span>⚠️</span><span style="color:#b45309">Adresse introuvable — vérifiez le format</span>';
+      }
+    } catch(e) { el2.innerHTML = ''; }
+  }, 600);
+}
+
 // ── Soumission formulaire ────────────────────────────────────────────────────
 async function submitForm(e) {
   e.preventDefault();
@@ -931,17 +978,23 @@ async function submitForm(e) {
   btn.textContent = '⏳ Inscription en cours…';
   showMsg('Envoi en cours…', '#9ca3af');
 
+  // 2ème adresse (optionnelle)
+  const adresse2 = document.getElementById('f-adresse2')?.value.trim() || '';
+  const label2   = document.getElementById('f-label2')?.value.trim()   || 'Adresse 2';
+
   try {
+    const body = {
+      action:   'subscribe',
+      nom:      (prenom + ' ' + nom).trim(),
+      email:    email,
+      adresse1: adresse,
+      label1:   label,
+    };
+    if (adresse2) { body.adresse2 = adresse2; body.label2 = label2; }
     const resp = await fetch(WEBAPP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action:   'subscribe',
-        nom:      (prenom + ' ' + nom).trim(),
-        email:    email,
-        adresse1: adresse,
-        label1:   label,
-      })
+      body: JSON.stringify(body)
     });
     const data = await resp.json();
     if (data.success) {
@@ -1016,17 +1069,23 @@ document.addEventListener('DOMContentLoaded', loadBetaCounter);
   btn.textContent = '⏳ Inscription en cours…';
   showMsg('Envoi en cours…', '#9ca3af');
 
+  // 2ème adresse (optionnelle)
+  const adresse2 = document.getElementById('f-adresse2')?.value.trim() || '';
+  const label2   = document.getElementById('f-label2')?.value.trim()   || 'Adresse 2';
+
   try {
+    const body = {
+      action:   'subscribe',
+      nom:      (prenom + ' ' + nom).trim(),
+      email:    email,
+      adresse1: adresse,
+      label1:   label,
+    };
+    if (adresse2) { body.adresse2 = adresse2; body.label2 = label2; }
     const resp = await fetch(WEBAPP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action:   'subscribe',
-        nom:      (prenom + ' ' + nom).trim(),
-        email:    email,
-        adresse1: adresse,
-        label1:   label,
-      })
+      body: JSON.stringify(body)
     });
     const data = await resp.json();
     if (data.success) {

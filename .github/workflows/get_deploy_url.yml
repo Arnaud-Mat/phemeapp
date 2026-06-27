@@ -1,0 +1,66 @@
+name: Get Deploy URL
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  get:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Setup
+        run: |
+          cat > ~/.clasprc.json << CREDS
+          {"tokens":{"default":{"client_id":"${{ secrets.CLASP_CLIENT_ID }}","client_secret":"${{ secrets.CLASP_CLIENT_SECRET }}","type":"authorized_user","refresh_token":"${{ secrets.CLASP_REFRESH_TOKEN }}"}}}
+          CREDS
+          echo '{"scriptId":"${{ secrets.APPS_SCRIPT_ID }}","rootDir":"."}' > .clasp.json
+
+      - name: Get all deployments + test URL
+        run: |
+          echo "=== DEPLOYMENTS ==="
+          clasp deployments 2>&1
+          echo "::notice::$(clasp deployments 2>&1)"
+
+          # Obtenir access token et lister via API REST
+          ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+            -d "client_id=${{ secrets.CLASP_CLIENT_ID }}&client_secret=${{ secrets.CLASP_CLIENT_SECRET }}&refresh_token=${{ secrets.CLASP_REFRESH_TOKEN }}&grant_type=refresh_token" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+          
+          SCRIPT_ID="${{ secrets.APPS_SCRIPT_ID }}"
+          
+          DEPLOYS=$(curl -s \
+            "https://script.googleapis.com/v1/projects/${SCRIPT_ID}/deployments" \
+            -H "Authorization: Bearer $ACCESS_TOKEN")
+          echo "API deployments: $DEPLOYS"
+          echo "::notice::API deployments: $DEPLOYS"
+
+          # Test POST sur chaque URL trouvée
+          DEPLOY_IDS=$(echo "$DEPLOYS" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+for dep in d.get('deployments',[]):
+    ep = dep.get('entryPoints',[])
+    for e in ep:
+        wa = e.get('webApp',{})
+        url = wa.get('url','')
+        access = wa.get('access','')
+        print(f'{dep[\"deploymentId\"]}|{url}|{access}')
+")
+          echo "::notice::Deploy IDs and URLs: $DEPLOY_IDS"
+          
+          while IFS='|' read -r did url access; do
+            if [ -n "$url" ]; then
+              RESULT=$(curl -sL -X POST -H "Content-Type: application/json" \
+                -d '{"action":"getUserCount"}' "$url" | head -c 200)
+              echo "::notice::POST to $url (access=$access): $RESULT"
+            fi
+          done <<< "$DEPLOY_IDS"

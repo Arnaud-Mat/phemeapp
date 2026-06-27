@@ -128,7 +128,20 @@ function onFormSubmit(e) {
 // ─────────────────────────────────────────────
 function doPost(e) {
   try {
-    var payload = JSON.parse(e.postData.contents);
+    var payload;
+
+    // Support double mode : JSON (fetch) et form POST (iframe, contournement CORS)
+    if (e.postData && e.postData.contents) {
+      try {
+        payload = JSON.parse(e.postData.contents);
+      } catch(parseErr) {
+        payload = e.parameter || {};
+      }
+    } else if (e.parameter && e.parameter.action) {
+      payload = e.parameter;
+    } else {
+      payload = {};
+    }
 
     // Router les actions du formulaire natif
     var action = payload.action || "";

@@ -2,7 +2,7 @@ name: PhemeApp - Detection quotidienne
 
 on:
   schedule:
-    - cron: "0 6 * * *"  # 7h heure suisse (UTC+1)
+    - cron: "0 6 * * *"  # 8h heure suisse été (UTC+2=CEST) / 7h heure hiver (UTC+1=CET)
   workflow_dispatch:
 
 permissions:

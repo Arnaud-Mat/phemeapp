@@ -993,7 +993,7 @@ async function submitForm(e) {
     if (adresse2) { body.adresse2 = adresse2; body.label2 = label2; }
     const resp = await fetch(WEBAPP_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(body)
     });
     const data = await resp.json();
@@ -1084,7 +1084,7 @@ document.addEventListener('DOMContentLoaded', loadBetaCounter);
     if (adresse2) { body.adresse2 = adresse2; body.label2 = label2; }
     const resp = await fetch(WEBAPP_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(body)
     });
     const data = await resp.json();

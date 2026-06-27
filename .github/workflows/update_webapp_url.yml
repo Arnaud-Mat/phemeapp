@@ -1,0 +1,105 @@
+name: Update WebApp URL
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Get new URL and update files
+        env:
+          CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+          SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, json, urllib.request, urllib.parse, sys, re
+
+          cid  = os.environ['CLIENT_ID']
+          csec = os.environ['CLIENT_SECRET']
+          rtok = os.environ['REFRESH_TOKEN']
+          sid  = os.environ['SCRIPT_ID']
+
+          # Access token
+          data = urllib.parse.urlencode({'client_id':cid,'client_secret':csec,
+              'refresh_token':rtok,'grant_type':'refresh_token'}).encode()
+          with urllib.request.urlopen(urllib.request.Request(
+              'https://oauth2.googleapis.com/token', data=data)) as r:
+              tok = json.loads(r.read())['access_token']
+
+          # List deployments
+          with urllib.request.urlopen(urllib.request.Request(
+              f'https://script.googleapis.com/v1/projects/{sid}/deployments',
+              headers={'Authorization':f'Bearer {tok}'})) as r:
+              deps = json.loads(r.read())
+
+          # Trouver le déploiement avec access vide (ANYONE_ANONYMOUS) qui répond OK
+          best_url = None
+          for dep in deps.get('deployments',[]):
+              did = dep.get('deploymentId','')
+              for ep in dep.get('entryPoints',[]):
+                  wa = ep.get('webApp',{})
+                  url = wa.get('url','')
+                  access = wa.get('access','')
+                  if not url: continue
+                  # Tester avec getUserCount
+                  try:
+                      body = json.dumps({"action":"getUserCount"}).encode()
+                      req = urllib.request.Request(url, data=body,
+                          headers={'Content-Type':'application/json'}, method='POST')
+                      with urllib.request.urlopen(req, timeout=15) as r2:
+                          result = json.loads(r2.read())
+                      if 'count' in result or 'success' in result:
+                          print(f"✅ URL fonctionnelle trouvée: {url}")
+                          print(f"::notice::NEW_URL:{url}")
+                          best_url = url
+                          break
+                  except Exception as e:
+                      print(f"❌ {did[:20]}: {e}")
+              if best_url: break
+
+          if not best_url:
+              print("::error::Aucune URL fonctionnelle trouvée")
+              sys.exit(1)
+
+          # Mettre à jour index.html et mon-compte.html
+          old_url = "https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec"
+
+          for fname in ['index.html', 'mon-compte.html']:
+              content = open(fname, encoding='utf-8').read()
+              if old_url in content:
+                  content = content.replace(old_url, best_url)
+                  open(fname, 'w', encoding='utf-8').write(content)
+                  print(f"✅ {fname} mis à jour")
+                  print(f"::notice::UPDATED:{fname}")
+              elif best_url in content:
+                  print(f"ℹ️ {fname} déjà à jour")
+              else:
+                  # Chercher n'importe quelle URL Apps Script et la remplacer
+                  content2 = re.sub(
+                      r'https://script\.google\.com/macros/s/[^/\'\"]+/exec',
+                      best_url, content
+                  )
+                  if content2 != content:
+                      open(fname, 'w', encoding='utf-8').write(content2)
+                      print(f"✅ {fname} mis à jour (regex)")
+                      print(f"::notice::UPDATED_REGEX:{fname}")
+          PYEOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "PhémeApp Bot"
+          git config user.email "alerte@phemeapp.ch"
+          git add index.html mon-compte.html || true
+          git diff --staged --quiet || git commit -m "fix: update WEBAPP_URL with anonymous-access deployment"
+          git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git HEAD:gh-pages || true

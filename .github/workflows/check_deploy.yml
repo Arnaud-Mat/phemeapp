@@ -1,0 +1,45 @@
+name: Check Apps Script Deploy
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Setup credentials
+        run: |
+          cat > ~/.clasprc.json << CREDS
+          {"tokens":{"default":{"client_id":"${{ secrets.CLASP_CLIENT_ID }}","client_secret":"${{ secrets.CLASP_CLIENT_SECRET }}","type":"authorized_user","refresh_token":"${{ secrets.CLASP_REFRESH_TOKEN }}"}}}
+          CREDS
+          echo '{"scriptId":"${{ secrets.APPS_SCRIPT_ID }}","rootDir":"."}' > .clasp.json
+
+      - name: List deployments
+        run: |
+          OUTPUT=$(clasp deployments 2>&1)
+          echo "$OUTPUT"
+          echo "::notice::Deployments: $OUTPUT"
+
+      - name: Test POST via curl (simule browser)
+        run: |
+          # Test avec follow redirect et cookie
+          RESULT=$(curl -sL \
+            -c /tmp/cookies.txt \
+            -b /tmp/cookies.txt \
+            -H "Origin: https://phemeapp.ch" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d '{"action":"getUserCount"}' \
+            "https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec" 2>&1 | head -c 500)
+          echo "POST result: $RESULT"
+          echo "::notice::POST test: $RESULT"

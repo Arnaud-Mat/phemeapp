@@ -550,8 +550,10 @@ function doPost_v2(e) {
 function handleSubscribe(payload) {
   var nom     = (payload.nom     || "").toString().trim().substring(0, 100);
   var email   = (payload.email   || "").toString().trim().toLowerCase();
-  var adresse = (payload.adresse1|| "").toString().trim().substring(0, 200);
-  var label   = (payload.label1  || "Adresse principale").toString().trim().substring(0, 50);
+  var adresse  = (payload.adresse1 || "").toString().trim().substring(0, 200);
+  var label    = (payload.label1  || "Adresse principale").toString().trim().substring(0, 50);
+  var adresse2 = (payload.adresse2 || "").toString().trim().substring(0, 200);
+  var label2   = (payload.label2  || "Adresse 2").toString().trim().substring(0, 50);
 
   // Validation basique
   if (!email || !adresse) {
@@ -593,7 +595,7 @@ function handleSubscribe(payload) {
 
   // Écrire dans le Sheet (colonnes B-E : nom, email, adresse1, label1)
   var timestamp = new Date().toISOString();
-  sheet.appendRow([timestamp, nom, email, adresse, label, "", ""]);
+  sheet.appendRow([timestamp, nom, email, adresse, label, adresse2, label2]);
   Logger.log("Nouvelle inscription: " + email);
 
   // Envoyer l'email de bienvenue

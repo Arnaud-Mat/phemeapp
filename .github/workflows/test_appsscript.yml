@@ -1,0 +1,26 @@
+name: Test Apps Script
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test getUserCount
+        run: |
+          RESULT=$(curl -sL "https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec?action=getUserCount")
+          echo "getUserCount: $RESULT"
+          echo "::notice::getUserCount response: $RESULT"
+
+      - name: Test subscribe
+        run: |
+          RESULT=$(curl -sL -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"action":"subscribe","nom":"Test Bot","email":"test.bot.phemeapp@mailinator.com","adresse1":"Rue de Bourg 10 1003 Lausanne","label1":"Test"}' \
+            "https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec")
+          echo "subscribe: $RESULT"
+          echo "::notice::subscribe response: $RESULT"

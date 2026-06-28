@@ -598,18 +598,42 @@ function handleSubscribe(payload) {
     }
   }
 
-  // Vérifier le quota de 100 utilisateurs
-  var userCount = rows.length - 1; // sans header
-  if (userCount >= 100) {
-    return ContentService
-      .createTextOutput(JSON.stringify({error: "quota_full", message: "Les 100 places bêta sont complètes."}))
-      .setMimeType(ContentService.MimeType.JSON);
+  // Vérifier le quota de 100 utilisateurs (seulement pour les inscriptions Vaud)
+  var horsVaud = (payload.hors_vaud === '1' || payload.hors_vaud === 1);
+
+  if (!horsVaud) {
+    var userCount = rows.length - 1; // sans header
+    if (userCount >= 100) {
+      return ContentService
+        .createTextOutput(JSON.stringify({error: "quota_full", message: "Les 100 places bêta sont complètes."}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
   }
 
-  // Écrire dans le Sheet (colonnes B-E : nom, email, adresse1, label1)
+  // Écrire dans le bon onglet
   var timestamp = new Date().toISOString();
-  sheet.appendRow([timestamp, nom, email, adresse, label, adresse2, label2]);
-  Logger.log("Nouvelle inscription: " + email);
+  if (horsVaud) {
+    // Sauvegarder dans l'onglet "Hors Vaud" (créé automatiquement si absent)
+    var sheetHV = ss.getSheetByName("Hors Vaud");
+    if (!sheetHV) {
+      sheetHV = ss.insertSheet("Hors Vaud");
+      sheetHV.appendRow(["Timestamp", "Nom", "Email", "Adresse", "Label", "Adresse2", "Label2"]);
+    }
+    // Vérifier doublon dans Hors Vaud
+    var hvRows = sheetHV.getDataRange().getValues();
+    for (var j = 1; j < hvRows.length; j++) {
+      if (hvRows[j][2] && hvRows[j][2].toString().toLowerCase() === email) {
+        return ContentService
+          .createTextOutput(JSON.stringify({hors_vaud: true, already_exists: true}))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    sheetHV.appendRow([timestamp, nom, email, adresse, label, adresse2, label2]);
+    Logger.log("Inscription hors Vaud: " + email);
+  } else {
+    sheet.appendRow([timestamp, nom, email, adresse, label, adresse2, label2]);
+    Logger.log("Nouvelle inscription: " + email);
+  }
 
   // Envoyer l'email de bienvenue
   try {
@@ -633,12 +657,36 @@ function handleSubscribe(payload) {
       + "<p style='font-size:14px;color:#444'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
       + "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;margin-top:24px'>PhémeApp est un service d'information automatisé. Il ne remplace pas une consultation juridique.</p>"
       + "</div></body></html>";
-    // Envoi via API Brevo (pour expédier depuis alerte@phemeapp.ch)
+    // Email selon le canton
+    var emailSubject, emailHtml;
+    if (horsVaud) {
+      emailSubject = "PhémeApp arrive bientôt dans votre canton";
+      emailHtml = "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333'>"
+        + "<div style='background:#1a3a5c;padding:18px 24px'>"
+        + "<h1 style='color:white;margin:0;font-size:20px'>PhémeApp</h1>"
+        + "<p style='color:#a8c4e0;margin:4px 0 0;font-size:12px'>Surveillance des mises à l'enquête</p>"
+        + "</div><div style='padding:24px'>"
+        + "<p style='font-size:16px'>Bonjour " + prenom + ",</p>"
+        + "<p style='font-size:14px;color:#444;line-height:1.7'>Merci de votre intérêt pour <strong>PhémeApp</strong>&nbsp;!</p>"
+        + "<div style='background:#fff8e1;border-left:3px solid #f59e0b;padding:14px 18px;margin:20px 0;border-radius:0 6px 6px 0'>"
+        + "<p style='margin:0 0 6px;font-size:14px;color:#92400e;font-weight:500'>Votre canton n'est pas encore couvert</p>"
+        + "<p style='margin:0;font-size:13px;color:#92400e;line-height:1.7'>PhémeApp surveille actuellement uniquement le <strong>canton de Vaud</strong>. Nous avons bien enregistré votre adresse (<strong>" + adresse + "</strong>) et nous vous contacterons dès que nous lancerons la surveillance dans votre région.</p>"
+        + "</div>"
+        + "<p style='font-size:14px;color:#444;line-height:1.7'>En attendant, si vous avez des questions, n'hésitez pas à nous écrire à <a href='mailto:alerte@phemeapp.ch'>alerte@phemeapp.ch</a>.</p>"
+        + "<p style='font-size:14px;color:#444'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
+        + "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;margin-top:24px'>PhémeApp — service d'information automatisé sur les mises à l'enquête publiques.</p>"
+        + "</div></body></html>";
+    } else {
+      emailSubject = "Votre surveillance PhémeApp est active";
+      emailHtml = html;
+    }
+
+    // Envoi via API Brevo
     var brevoPayload = {
       sender: { name: "PhémeApp", email: "alerte@phemeapp.ch" },
       to: [{ email: email, name: nom || "Utilisateur" }],
-      subject: "Votre surveillance PhémeApp est active",
-      htmlContent: html
+      subject: emailSubject,
+      htmlContent: emailHtml
     };
     UrlFetchApp.fetch("https://api.brevo.com/v3/smtp/email", {
       method: "post",
@@ -656,7 +704,7 @@ function handleSubscribe(payload) {
   }
 
   return ContentService
-    .createTextOutput(JSON.stringify({success: true}))
+    .createTextOutput(JSON.stringify(horsVaud ? {hors_vaud: true} : {success: true}))
     .setMimeType(ContentService.MimeType.JSON);
 }
 

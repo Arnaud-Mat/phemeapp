@@ -633,12 +633,21 @@ function handleSubscribe(payload) {
       + "<p style='font-size:14px;color:#444'>Bien cordialement,<br><strong>L'équipe PhémeApp</strong></p>"
       + "<p style='font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;margin-top:24px'>PhémeApp est un service d'information automatisé. Il ne remplace pas une consultation juridique.</p>"
       + "</div></body></html>";
-    MailApp.sendEmail({
-      to: email,
+    // Envoi via API Brevo (pour expédier depuis alerte@phemeapp.ch)
+    var brevoPayload = {
+      sender: { name: "PhémeApp", email: "alerte@phemeapp.ch" },
+      to: [{ email: email, name: nom || "Utilisateur" }],
       subject: "Votre surveillance PhémeApp est active",
-      htmlBody: html,
-      from: "alerte@phemeapp.ch",
-      name: "PhémeApp"
+      htmlContent: html
+    };
+    UrlFetchApp.fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        "api-key": "xsmtpsib-c35d132ff59c0a7acd47584a3064fd78986954a2a1ec3cda491e4246b3f96516-MLMfUsjvSEhDzf9F"
+      },
+      payload: JSON.stringify(brevoPayload),
+      muteHttpExceptions: true
     });
     Logger.log("Email bienvenue envoyé à " + email);
   } catch(mailErr) {

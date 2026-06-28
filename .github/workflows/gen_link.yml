@@ -1,0 +1,35 @@
+name: Generate Magic Link
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'Email utilisateur'
+        required: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  gen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate link
+        env:
+          MAGIC_LINK_SECRET: ${{ secrets.MAGIC_LINK_SECRET }}
+          MAGIC_LINK_BASE: ${{ secrets.MAGIC_LINK_BASE }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, hmac, hashlib, datetime
+          from urllib.parse import quote
+
+          email  = "${{ inputs.email }}"
+          secret = os.environ['MAGIC_LINK_SECRET']
+          base   = os.environ.get('MAGIC_LINK_BASE', 'https://phemeapp.ch/mon-compte.html')
+          mois   = datetime.datetime.now().strftime('%Y-%m')
+          raw    = f"{email}:{mois}"
+          token  = hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()[:32]
+          url    = f"{base}?token={token}&email={quote(email)}"
+          print(f"::notice::MAGIC_LINK:{url}")
+          print(f"URL: {url}")
+          PYEOF

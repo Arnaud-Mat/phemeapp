@@ -1152,21 +1152,6 @@ function showMsg(text, color) {
   el.style.color = color;
 }
 
-// ── Compteur bêta (BUG-FORM-01 fix) ─────────────────────────────────────────
-async function loadBetaCounter() {
-  try {
-    const r = await fetch(WEBAPP_URL + '?action=getUserCount');
-    const d = await r.json();
-    if (typeof d.count === 'number') {
-      const remaining = Math.max(0, 100 - d.count);
-      const pct = Math.min(100, (d.count / 100) * 100);
-      document.getElementById('beta-remaining').textContent = remaining + ' / 100';
-      document.getElementById('beta-bar').style.width = pct + '%';
-      document.getElementById('beta-counter').style.display = 'block';
-    }
-  } catch(e) { /* silencieux si Apps Script indisponible */ }
-}
-document.addEventListener('DOMContentLoaded', loadBetaCounter);
 </script>
 </body>
 </html>

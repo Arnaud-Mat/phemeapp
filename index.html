@@ -866,6 +866,7 @@ const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHS
 // ── Géocodage Swisstopo ──────────────────────────────────────────────────────
 let geocodeTimer = null;
 let geocodeValid = false;
+let isVaudAddress = true; // false si adresse détectée hors VD
 let geocodedLabel = '';
 
 function debounceGeocode() {
@@ -898,8 +899,10 @@ async function geocodeAddress(adresse) {
                      canton.includes('vd') ||
                      (attrs.lon && attrs.lon > 6.1 && attrs.lon < 7.2 && attrs.lat > 46.3 && attrs.lat < 47.0);
       if (!isVaud) {
+        isVaudAddress = false;
         setGeocodeStatus('⚠️', '#b45309', 'Adresse trouvée hors canton de Vaud : <strong>' + label + '</strong>. PhémeApp surveille uniquement le canton de Vaud.');
       } else {
+        isVaudAddress = true;
         setGeocodeStatus('✅', '#1a7a4a', 'Adresse trouvée : <strong>' + label + '</strong>');
       }
     } else {
@@ -1032,16 +1035,19 @@ async function submitForm(e) {
 
   try {
     const body = {
-      action:   'subscribe',
-      nom:      (prenom + ' ' + nom).trim(),
-      email:    email,
-      adresse1: adresse,
-      label1:   label,
+      action:    'subscribe',
+      nom:       (prenom + ' ' + nom).trim(),
+      email:     email,
+      adresse1:  adresse,
+      label1:    label,
+      hors_vaud: isVaudAddress ? '0' : '1',
     };
     if (adresse2) { body.adresse2 = adresse2; body.label2 = label2; }
     // Soumission via iframe cachée pour contourner CORS (Apps Script ne supporte pas CORS sur POST)
     const result = await submitViaIframe(body);
-    if (result === 'success') {
+    if (result === 'hors_vaud') {
+      showConfirmationHorsVaud(prenom);
+    } else if (result === 'success') {
       showConfirmation(adresse, prenom);
     } else if (result === 'already_exists') {
       showMsg('✅ Cette adresse email est déjà inscrite. Consultez votre email de bienvenue.', '#1a7a4a');
@@ -1057,6 +1063,18 @@ async function submitForm(e) {
     btn.disabled    = false;
     btn.textContent = 'Activer ma surveillance →';
   }
+}
+
+function showConfirmationHorsVaud(prenom) {
+  document.getElementById('form-fields').style.display = 'none';
+  document.getElementById('form-success').style.display = 'block';
+  const greeting = prenom ? 'Merci ' + prenom + ' !' : 'Merci !';
+  const msg = document.getElementById('success-msg');
+  msg.innerHTML = '<strong>' + greeting + '</strong> Votre canton n'est pas encore couvert par PhémeApp.';
+  const sub = document.createElement('p');
+  sub.style.cssText = 'margin-top:12px;font-size:14px;color:#555;line-height:1.6';
+  sub.textContent = 'Nous avons bien enregistré votre adresse. Nous vous contacterons dès que nous lancerons la surveillance dans votre canton.';
+  msg.appendChild(sub);
 }
 
 function showConfirmation(adresse, prenom) {
@@ -1105,11 +1123,12 @@ function showMsg(text, color) {
 
   try {
     const body = {
-      action:   'subscribe',
-      nom:      (prenom + ' ' + nom).trim(),
-      email:    email,
-      adresse1: adresse,
-      label1:   label,
+      action:    'subscribe',
+      nom:       (prenom + ' ' + nom).trim(),
+      email:     email,
+      adresse1:  adresse,
+      label1:    label,
+      hors_vaud: isVaudAddress ? '0' : '1',
     };
     if (adresse2) { body.adresse2 = adresse2; body.label2 = label2; }
     const resp = await fetch(WEBAPP_URL, {

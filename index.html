@@ -968,55 +968,34 @@ function debounceGeocode2() {
 
 // ── Soumission formulaire ────────────────────────────────────────────────────
 
-// ── Soumission iframe (contournement CORS Apps Script) ────────────────────────
+// Soumission via iframe cachée (contournement CORS Apps Script)
 function submitViaIframe(payload) {
-  return new Promise((resolve) => {
-    const iframeName = 'gas_submit_' + Date.now();
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeName;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
+  const iframeName = 'gas_' + Date.now();
+  const iframe = document.createElement('iframe');
+  iframe.name = iframeName;
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = WEBAPP_URL;
-    form.target = iframeName;
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = WEBAPP_URL;
+  form.target = iframeName;
 
-    // Apps Script lit e.parameter pour les form posts
-    Object.entries(payload).forEach(([k, v]) => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = k;
-      input.value = v;
-      form.appendChild(input);
-    });
-    document.body.appendChild(form);
-
-    // Attendre la réponse via postMessage depuis le GAS ou timeout
-    let resolved = false;
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        // Après 8s sans réponse on considère succès (Apps Script a reçu, pas de callback possible)
-        document.body.removeChild(iframe);
-        document.body.removeChild(form);
-        resolve('success');
-      }
-    }, 8000);
-
-    iframe.onload = () => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeout);
-        document.body.removeChild(iframe);
-        document.body.removeChild(form);
-        // On ne peut pas lire l'iframe (cross-origin), on suppose succès
-        resolve('success');
-      }
-    };
-
-    form.submit();
+  Object.entries(payload).forEach(([k, v]) => {
+    const input = document.createElement('input');
+    input.type  = 'hidden';
+    input.name  = k;
+    input.value = v;
+    form.appendChild(input);
   });
+  document.body.appendChild(form);
+  form.submit();
+
+  // Nettoyage après 10s
+  setTimeout(() => {
+    try { document.body.removeChild(iframe); } catch(e) {}
+    try { document.body.removeChild(form); }  catch(e) {}
+  }, 10000);
 }
 
 async function submitForm(e) {
@@ -1028,8 +1007,9 @@ async function submitForm(e) {
   const label   = document.getElementById('f-label')?.value.trim()   || 'Adresse principale';
   const btn     = document.getElementById('f-submit');
 
+  // ── Validation champs obligatoires ──
   if (!email || !adresse) {
-    showMsg('Veuillez remplir au minimum votre email et l\'adresse à surveiller.', '#dc2626');
+    showMsg('Veuillez remplir votre email et l\'adresse à surveiller.', '#dc2626');
     return;
   }
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1037,83 +1017,43 @@ async function submitForm(e) {
     showMsg('Adresse email invalide.', '#dc2626');
     return;
   }
+
+  // ── Validation adresse (géocodage) ──
   if (!geocodeValid) {
-    // Lancer le géocodage si pas encore fait
+    setGeocodeStatus('⏳', '#9ca3af', 'Vérification de l\'adresse…');
     await geocodeAddress(adresse);
     if (!geocodeValid) {
-      showMsg('Adresse introuvable. Corrigez l\'adresse avant de continuer.', '#dc2626');
+      showMsg('Adresse introuvable — vérifiez le format (ex: Route du Marché 16, 1260 Nyon).', '#dc2626');
       return;
     }
   }
 
+  // ── Envoi ──
   btn.disabled    = true;
   btn.textContent = '⏳ Inscription en cours…';
-  showMsg('Envoi en cours…', '#9ca3af');
 
-  // 2ème adresse (optionnelle)
   const adresse2 = document.getElementById('f-adresse2')?.value.trim() || '';
   const label2   = document.getElementById('f-label2')?.value.trim()   || 'Adresse 2';
 
-  try {
-    const body = {
-      action:    'subscribe',
-      nom:       (prenom + ' ' + nom).trim(),
-      email:     email,
-      adresse1:  adresse,
-      label1:    label,
-      hors_vaud: isVaudAddress ? '0' : '1',
-    };
-    if (adresse2) { body.adresse2 = adresse2; body.label2 = label2; }
-    // Soumission via iframe cachée pour contourner CORS (Apps Script ne supporte pas CORS sur POST)
-    const result = await submitViaIframe(body);
-    if (result === 'hors_vaud') {
-      showConfirmationHorsVaud(prenom);
-    } else if (result === 'success') {
-      showConfirmation(adresse, prenom);
-    } else if (result === 'already_exists') {
-      showMsg('✅ Cette adresse email est déjà inscrite. Consultez votre email de bienvenue.', '#1a7a4a');
-      btn.disabled    = false;
-      btn.textContent = 'Activer ma surveillance →';
-    } else {
-      throw new Error(result || 'Erreur inconnue');
-    }
-  } catch(err) {
-    console.warn('Apps Script indisponible, fallback Google Form:', err);
-    window.open('https://docs.google.com/forms/d/e/1FAIpQLSdmPA95DdBpJaUtvfHDA0Y_SL4Nr0ZmFCzPv-ySSW3d9Oq3kQ/viewform', '_blank');
-    showMsg('Remplissez le formulaire qui vient de s\'ouvrir pour finaliser votre inscription.', '#9ca3af');
-    btn.disabled    = false;
-    btn.textContent = 'Activer ma surveillance →';
+  const body = {
+    action:    'subscribe',
+    nom:       (prenom + ' ' + nom).trim(),
+    email:     email,
+    adresse1:  adresse,
+    label1:    label,
+    hors_vaud: isVaudAddress ? '0' : '1',
+  };
+  if (adresse2) { body.adresse2 = adresse2; body.label2 = label2; }
+
+  // Envoyer en arrière-plan via iframe
+  submitViaIframe(body);
+
+  // Afficher immédiatement le bon message selon le canton
+  if (!isVaudAddress) {
+    showConfirmationHorsVaud(prenom);
+  } else {
+    showConfirmation(adresse, prenom);
   }
-}
-
-function showConfirmationHorsVaud(prenom) {
-  document.getElementById('form-fields').style.display = 'none';
-  document.getElementById('form-success').style.display = 'block';
-  const greeting = prenom ? 'Merci ' + prenom + ' !' : 'Merci !';
-  const msg = document.getElementById('success-msg');
-  msg.innerHTML = '<strong>' + greeting + '</strong> Votre canton n'est pas encore couvert par PhémeApp.';
-  const sub = document.createElement('p');
-  sub.style.cssText = 'margin-top:12px;font-size:14px;color:#555;line-height:1.6';
-  sub.textContent = 'Nous avons bien enregistré votre adresse. Nous vous contacterons dès que nous lancerons la surveillance dans votre canton.';
-  msg.appendChild(sub);
-}
-
-function showConfirmation(adresse, prenom) {
-  document.getElementById('form-fields').style.display = 'none';
-  document.getElementById('form-success').style.display = 'block';
-  const greeting = prenom ? 'Merci ' + prenom + '\u00a0!' : 'Merci\u00a0!';
-  const msg = document.getElementById('success-msg');
-  msg.innerHTML = '<strong>' + greeting + '</strong> Dès demain matin à 8h, nous vous notifierons si une mise à l\'enquête est annoncée autour de ';
-  const adresseSpan = document.createElement('strong');
-  adresseSpan.textContent = adresse;
-  msg.appendChild(adresseSpan);
-  msg.appendChild(document.createTextNode('.'));
-}
-
-function showMsg(text, color) {
-  const el = document.getElementById('form-msg');
-  el.textContent = text;
-  el.style.color = color;
 }
 
 </script>

@@ -240,9 +240,7 @@ function doGet(e) {
 
 function verifyMagicToken(email, token) {
   // Vérifier pour le mois courant et le mois précédent
-  // Lire le secret depuis PropertiesService (synchronisé via workflow sync_secret)
-  var secret = PropertiesService.getScriptProperties().getProperty("MAGIC_LINK_SECRET")
-              || "db842af52df466861c7ce6605a760ad6ddaebf682f302a29";
+  var secret = "db842af52df466861c7ce6605a760ad6ddaebf682f302a29"; // sync_secret.yml remplace cette valeur
   var now = new Date();
 
   for (var delta = 0; delta <= 1; delta++) {

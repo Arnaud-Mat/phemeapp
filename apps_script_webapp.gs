@@ -112,13 +112,20 @@ function onFormSubmit(e) {
     + "<p style=\'font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;margin-top:24px\'>Ph\u00e9meApp est en phase de test (beta). Il ne remplace pas une consultation juridique.</p>"
     + "</div></body></html>";
 
-  MailApp.sendEmail({
-    to: email,
-    subject: "Votre surveillance Ph\u00e9meApp est active",
-    htmlBody: html,
-    from: "alerte@phemeapp.ch",
-    name: "Ph\u00e9meApp"
-  });
+    // Envoi via API Brevo (alerte@phemeapp.ch)
+    var brevoPayload = {
+      sender: { name: "PhémeApp", email: "alerte@phemeapp.ch" },
+      to: [{ email: email, name: nom || "Utilisateur" }],
+      subject: "Votre surveillance PhémeApp est active",
+      htmlContent: html
+    };
+    UrlFetchApp.fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "post",
+      contentType: "application/json",
+      headers: { "api-key": "xsmtpsib-c35d132ff59c0a7acd47584a3064fd78986954a2a1ec3cda491e4246b3f96516-MLMfUsjvSEhDzf9F" },
+      payload: JSON.stringify(brevoPayload),
+      muteHttpExceptions: true
+    });
 
   Logger.log("Email bienvenue envoye a " + email);
 }
@@ -233,7 +240,9 @@ function doGet(e) {
 
 function verifyMagicToken(email, token) {
   // Vérifier pour le mois courant et le mois précédent
-  var secret = "db842af52df466861c7ce6605a760ad6ddaebf682f302a29";
+  // Lire le secret depuis PropertiesService (synchronisé via workflow sync_secret)
+  var secret = PropertiesService.getScriptProperties().getProperty("MAGIC_LINK_SECRET")
+              || "db842af52df466861c7ce6605a760ad6ddaebf682f302a29";
   var now = new Date();
 
   for (var delta = 0; delta <= 1; delta++) {

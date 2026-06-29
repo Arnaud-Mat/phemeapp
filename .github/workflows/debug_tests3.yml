@@ -1,0 +1,33 @@
+name: Debug Tests v3
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install requests pytest --break-system-packages -q
+      - name: Run tests
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SENDER: ${{ secrets.BREVO_SENDER }}
+          MAGIC_LINK_SECRET: ${{ secrets.MAGIC_LINK_SECRET }}
+          MAGIC_LINK_BASE: ${{ secrets.MAGIC_LINK_BASE }}
+          APPS_SCRIPT_WEBAPP_URL: ${{ secrets.APPS_SCRIPT_WEBAPP_URL }}
+        run: |
+          set +e
+          python3 -m pytest tests/ -v --tb=short -m "not slow" 2>&1 | tee /tmp/pytest_out.txt
+          # Extraire toutes les lignes FAILED et les tracebacks
+          FAILS=$(grep -E "FAILED|PASSED|ERROR|passed|failed|error|AssertionError|short test summary" /tmp/pytest_out.txt)
+          echo "::notice::$FAILS"

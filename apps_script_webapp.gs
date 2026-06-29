@@ -756,3 +756,10 @@ function createFormTrigger() {
   Logger.log('✅ Trigger créé: onFormSubmit_withTrigger → Form PhémeApp');
   Logger.log('Vérifiez dans Déclencheurs: événement doit être "À la soumission du formulaire"');
 }
+
+
+// Appelé par le workflow CI pour synchroniser le secret HMAC
+function setMagicLinkSecret(secret) {
+  PropertiesService.getScriptProperties().setProperty("MAGIC_LINK_SECRET", secret);
+  Logger.log("MAGIC_LINK_SECRET mis à jour");
+}

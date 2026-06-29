@@ -1,0 +1,29 @@
+name: Debug Tests v2
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install requests pytest --break-system-packages -q
+      - name: Run tests and capture result
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          MAGIC_LINK_SECRET: ${{ secrets.MAGIC_LINK_SECRET }}
+        run: |
+          set +e
+          python3 -m pytest tests/ -v --tb=short 2>&1 | tee /tmp/out.txt
+          # Extraire les lignes importantes
+          SUMMARY=$(grep -E "PASSED|FAILED|ERROR|passed|failed|error|short test summary" /tmp/out.txt | tail -30)
+          echo "::notice::RESULTS: $SUMMARY"

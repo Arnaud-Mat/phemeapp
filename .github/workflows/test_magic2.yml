@@ -1,0 +1,45 @@
+name: Test Magic Link v2
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test both secrets
+        env:
+          MAGIC_LINK_SECRET: ${{ secrets.MAGIC_LINK_SECRET }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, hmac, hashlib, datetime, urllib.request, json
+          from urllib.parse import quote
+
+          email = "arnaud.mathier@gmail.com"
+          mois  = datetime.datetime.now().strftime('%Y-%m')
+
+          # Secret 1 : celui du GitHub Secret
+          s1 = os.environ.get('MAGIC_LINK_SECRET', '')
+          t1 = hmac.new(s1.encode(), f"{email}:{mois}".encode(), hashlib.sha256).hexdigest()[:32]
+
+          # Secret 2 : celui hardcodé dans le GS (fallback)
+          s2 = "db842af52df466861c7ce6605a760ad6ddaebf682f302a29"
+          t2 = hmac.new(s2.encode(), f"{email}:{mois}".encode(), hashlib.sha256).hexdigest()[:32]
+
+          print(f"Secret GitHub (8c): {s1[:8]}... → token: {t1}")
+          print(f"Secret GS (8c): {s2[:8]}... → token: {t2}")
+          print(f"Secrets identiques: {s1 == s2}")
+
+          WA = "https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec"
+          for label, token in [("GitHub secret", t1), ("GS hardcoded", t2)]:
+              url = f"{WA}?action=getUser&token={token}&email={quote(email)}"
+              try:
+                  with urllib.request.urlopen(url, timeout=15) as r:
+                      result = json.loads(r.read())
+                      print(f"::notice::{label}: valid={result.get('valid')} | {json.dumps(result)[:150]}")
+              except Exception as e:
+                  print(f"::notice::{label} ERROR: {e}")
+          PYEOF

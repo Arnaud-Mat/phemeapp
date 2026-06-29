@@ -58,6 +58,8 @@ jobs:
           APPS_SCRIPT_WEBAPP_URL: ${{ secrets.APPS_SCRIPT_WEBAPP_URL }}
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          MAGIC_LINK_SECRET: ${{ secrets.MAGIC_LINK_SECRET }}
+          MAGIC_LINK_BASE: ${{ secrets.MAGIC_LINK_BASE }}
         run: python3 phemeapp.py
       - name: Commit notified.json
         if: always()

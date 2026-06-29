@@ -1,0 +1,81 @@
+name: Deploy Final Pre-Launch
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          token: ${{ secrets.GH_PAT }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Setup clasp
+        run: |
+          cat > ~/.clasprc.json << CREDS
+          {"tokens":{"default":{"client_id":"${{ secrets.CLASP_CLIENT_ID }}","client_secret":"${{ secrets.CLASP_CLIENT_SECRET }}","type":"authorized_user","refresh_token":"${{ secrets.CLASP_REFRESH_TOKEN }}"}}}
+          CREDS
+          echo '{"scriptId":"${{ secrets.APPS_SCRIPT_ID }}","rootDir":"."}' > .clasp.json
+          cp apps_script_webapp.gs Code.gs
+          cat > appsscript.json << META
+          {"timeZone":"Europe/Zurich","dependencies":{},"exceptionLogging":"STACKDRIVER","runtimeVersion":"V8","webapp":{"executeAs":"USER_DEPLOYING","access":"ANYONE_ANONYMOUS"}}
+          META
+
+      - name: Push + Deploy Apps Script
+        run: |
+          clasp push --force
+          clasp deploy --deploymentId "AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w" --description "pre-launch final"
+          echo "::notice::$(clasp deployments 2>&1)"
+
+      - name: Set MAGIC_LINK_SECRET in PropertiesService
+        env:
+          MAGIC_LINK_SECRET: ${{ secrets.MAGIC_LINK_SECRET }}
+          CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+          SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, json, urllib.request, urllib.parse
+
+          # Token
+          data = urllib.parse.urlencode({'client_id':os.environ['CLIENT_ID'],
+              'client_secret':os.environ['CLIENT_SECRET'],
+              'refresh_token':os.environ['REFRESH_TOKEN'],
+              'grant_type':'refresh_token'}).encode()
+          with urllib.request.urlopen(urllib.request.Request(
+              'https://oauth2.googleapis.com/token', data=data)) as r:
+              tok = json.loads(r.read())['access_token']
+
+          # Exécuter un script GAS pour set la property
+          sid = os.environ['SCRIPT_ID']
+          secret = os.environ['MAGIC_LINK_SECRET']
+          body = json.dumps({
+              "function": "setMagicLinkSecret",
+              "parameters": [secret],
+              "devMode": False
+          }).encode()
+          req = urllib.request.Request(
+              f'https://script.googleapis.com/v1/scripts/{sid}:run',
+              data=body, headers={
+                  'Authorization': f'Bearer {tok}',
+                  'Content-Type': 'application/json'
+              })
+          try:
+              with urllib.request.urlopen(req) as r:
+                  print(f"::notice::PropertiesService set: {r.read()[:200]}")
+          except Exception as e:
+              print(f"::notice::Run API error (normal si Apps API pas activée): {e}")
+          PYEOF

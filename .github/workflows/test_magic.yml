@@ -1,0 +1,37 @@
+name: Test Magic Link
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test magic link end-to-end
+        env:
+          MAGIC_LINK_SECRET: ${{ secrets.MAGIC_LINK_SECRET }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, hmac, hashlib, datetime, urllib.request, json
+          from urllib.parse import quote
+
+          secret = os.environ.get('MAGIC_LINK_SECRET', '')
+          email  = "arnaud.mathier@gmail.com"
+          mois   = datetime.datetime.now().strftime('%Y-%m')
+          token  = hmac.new(secret.encode(), f"{email}:{mois}".encode(), hashlib.sha256).hexdigest()[:32]
+          print(f"Secret (8 chars): {secret[:8]}...")
+          print(f"Token: {token}")
+
+          # Tester via Apps Script
+          url = f"https://script.google.com/macros/s/AKfycbx8CIFB6iyzNUYWE_SHSuvCzHI3SLz2lSXQcRDvm671ARn39r6Mx29CtvsAf02ACNdl7w/exec?action=getUser&token={token}&email={quote(email)}"
+          try:
+              with urllib.request.urlopen(url, timeout=20) as r:
+                  result = json.loads(r.read())
+                  valid = result.get('valid', False)
+                  print(f"::notice::RESULT: valid={valid} | response={json.dumps(result)[:300]}")
+          except Exception as e:
+              print(f"::notice::ERROR: {e}")
+          PYEOF

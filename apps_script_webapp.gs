@@ -239,7 +239,7 @@ function doGet(e) {
 }
 
 function verifyMagicToken(email, token) {
-  // Vérifier pour le mois courant et le mois précédent
+  // Même algo que phemeapp.py : HMAC-SHA256(key=secret, msg=email:mois)[:32]
   var secret = "db842af52df466861c7ce6605a760ad6ddaebf682f302a29"; // sync_secret.yml remplace cette valeur
   var now = new Date();
 
@@ -247,12 +247,13 @@ function verifyMagicToken(email, token) {
     var d = new Date(now);
     d.setMonth(d.getMonth() - delta);
     var mois = Utilities.formatDate(d, "UTC", "yyyy-MM");
-    var raw = email + ":" + mois + ":" + secret;
-    var expected = Utilities.computeDigest(
-      Utilities.DigestAlgorithm.SHA_256,
-      raw,
-      Utilities.Charset.UTF_8
-    ).map(function(b) {
+    var raw = email + ":" + mois;
+
+    // HMAC-SHA256 : clé=secret, message=raw
+    var secretBytes = Utilities.newBlob(secret).getBytes();
+    var rawBytes    = Utilities.newBlob(raw).getBytes();
+    var hmacBytes   = Utilities.computeHmacSha256Signature(rawBytes, secretBytes);
+    var expected    = hmacBytes.map(function(b) {
       return ("0" + (b & 0xFF).toString(16)).slice(-2);
     }).join("").substring(0, 32);
 

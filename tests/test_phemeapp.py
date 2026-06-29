@@ -253,7 +253,9 @@ def test_magic_token_deterministe():
 
 def test_verify_magic_token_valide():
     """Token du mois courant est valide."""
-    import phemeapp
+    import os, phemeapp
+    if not os.environ.get("MAGIC_LINK_SECRET"):
+        import pytest; pytest.skip("MAGIC_LINK_SECRET non configuré")
     email = "test@test.com"
     token = phemeapp.generate_magic_token(email)
     assert phemeapp.verify_magic_token(email, token)

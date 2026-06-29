@@ -1,0 +1,74 @@
+name: Run GAS setMagicLinkSecret
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get token and run function
+        env:
+          CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+          SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+          MAGIC_LINK_SECRET: ${{ secrets.MAGIC_LINK_SECRET }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, json, urllib.request, urllib.parse
+
+          # Obtenir access token
+          data = urllib.parse.urlencode({
+              'client_id':     os.environ['CLIENT_ID'],
+              'client_secret': os.environ['CLIENT_SECRET'],
+              'refresh_token': os.environ['REFRESH_TOKEN'],
+              'grant_type':    'refresh_token'
+          }).encode()
+          with urllib.request.urlopen(urllib.request.Request(
+              'https://oauth2.googleapis.com/token', data=data)) as r:
+              tok = json.loads(r.read())['access_token']
+          print(f"Token: {tok[:20]}...")
+
+          sid    = os.environ['SCRIPT_ID']
+          secret = os.environ['MAGIC_LINK_SECRET']
+
+          # Activer Apps Script API si nécessaire + exécuter setMagicLinkSecret
+          body = json.dumps({
+              "function": "setMagicLinkSecret",
+              "parameters": [secret],
+              "devMode": False
+          }).encode()
+
+          req = urllib.request.Request(
+              f'https://script.googleapis.com/v1/scripts/{sid}:run',
+              data=body,
+              headers={
+                  'Authorization': f'Bearer {tok}',
+                  'Content-Type': 'application/json'
+              }
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  result = json.loads(r.read())
+                  print(f"::notice::SUCCESS: {result}")
+          except urllib.error.HTTPError as e:
+              body_err = e.read().decode()
+              print(f"::notice::HTTP {e.code}: {body_err[:300]}")
+              # Si API non activée → alternative : scriptsProperties via API REST
+              if e.code in (403, 404):
+                  print("::notice::Trying Properties API directly...")
+                  # Lire le script pour voir les properties existantes
+                  req2 = urllib.request.Request(
+                      f'https://script.googleapis.com/v1/projects/{sid}/content',
+                      headers={'Authorization': f'Bearer {tok}'}
+                  )
+                  try:
+                      with urllib.request.urlopen(req2) as r2:
+                          print(f"::notice::Project accessible: {str(r2.read()[:100])}")
+                  except Exception as e2:
+                      print(f"::notice::Project API: {e2}")
+          PYEOF

@@ -904,13 +904,30 @@ function debounceGeocode() {
 async function geocodeAddress(adresse) {
   try {
     const url = 'https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText='
-      + encodeURIComponent(adresse) + '&type=locations&sr=4326&limit=1';
+      + encodeURIComponent(adresse) + '&type=locations&sr=4326&limit=10';
     const r    = await fetch(url);
     const data = await r.json();
-    const results = data.results || [];
+    const allResults = data.results || [];
+
+    // Ne garder que les vrais résultats "adresse" (numéro de rue), pas les zones/régions/lieux-dits
+    const addressResults = allResults.filter(res => {
+      const origin = (res.attrs?.origin || '').toLowerCase();
+      return origin === 'address';
+    });
+    const results = addressResults.length > 0 ? addressResults : allResults;
+
     if (results.length > 0) {
       const attrs = results[0].attrs || {};
       const label = (attrs.label || adresse).replace(/<[^>]+>/g, '');
+      const origin = (attrs.origin || '').toLowerCase();
+
+      // Si même après filtrage on n'a pas une vraie adresse → message clair, pas de jargon API
+      if (origin !== 'address') {
+        geocodeValid = false;
+        setGeocodeStatus('⚠️', '#b45309', 'Adresse trop vague — précisez le numéro et la rue (ex: Route du Marché 16, 1260 Nyon).');
+        return;
+      }
+
       const canton = (attrs.origin || attrs.layerBodId || '').toLowerCase();
       geocodeValid = true;
       geocodedLabel = label;

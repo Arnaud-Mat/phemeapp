@@ -1,0 +1,31 @@
+name: Check Brevo Sender Auth
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get sender domain auth status
+        env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, json, urllib.request
+
+          key = os.environ['BREVO_API_KEY']
+          req = urllib.request.Request(
+              'https://api.brevo.com/v3/senders/domains',
+              headers={'api-key': key, 'Accept': 'application/json'}
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=15) as r:
+                  data = json.loads(r.read())
+                  print(f"::notice::DOMAINS: {json.dumps(data)[:1500]}")
+          except Exception as e:
+              print(f"::notice::ERROR: {e}")
+          PYEOF

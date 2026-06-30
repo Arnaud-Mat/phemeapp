@@ -567,8 +567,8 @@ def send_email(dest_email, dest_nom, enquete, adresse, distance_m, profil=''):
     nature      = enquete.get("natureTravaux", "—")
     fao_lib     = enquete.get("faoLib", "")
     # BUG-007 fix: lien vers site communal si disponible, sinon FAO Vaud
-    commune_url = find_commune_enquetes_url(commune.upper()) if commune and commune != "—" else None
-    lien        = commune_url if commune_url else FAO_BASE_URL
+    # BUG-LINK-NYON fix: ne plus deviner les URLs communales (faux positifs type page accueil) — toujours utiliser la FAO officielle
+    lien        = FAO_BASE_URL
     msg_profil = ("<p style='font-size:13px;color:#dc2626;background:#fee2e2;padding:10px 14px;border-radius:6px;margin:12px 0'>Locataire: consultez le dossier gratuitement \u00e0 la commune.</p>" if profil and "locataire" in profil.lower() else "<p style='font-size:13px;color:#666'>En cas de doute, contactez votre commune.</p>")
     # IDEA-P15: lien cadastre vaudois (geo.vd.ch)
     lat_enq = enquete.get("lat", "")
@@ -758,10 +758,16 @@ def _resolve_lien_from_row(row: dict) -> str:
 
 def find_commune_enquetes_url(commune_name):
     """
-    Cherche automatiquement la page des mises a l enquete du site communal.
-    Utilise une recherche DuckDuckGo puis verifie les resultats.
-    Retourne l URL si trouvee, sinon None.
+    DÉSACTIVÉ (BUG-LINK-NYON) : la détection heuristique d'URL communale
+    (test de patterns + recherche de mots-clés sur la page) produisait des
+    faux positifs — ex: page d'accueil de Nyon validée car contenant le mot
+    "permis de construire" dans son menu. Trop risqué pour un lien envoyé
+    par email. On utilise désormais systématiquement la FAO officielle
+    (source légale de référence, garantie stable) via le fallback de
+    chaque appelant.
     """
+    return None
+    # ── Ancien code conservé ci-dessous pour référence, jamais exécuté ──
     # D abord verifier dans COMMUNE_BACKUP_URLS
     if commune_name.upper() in COMMUNE_BACKUP_URLS:
         return COMMUNE_BACKUP_URLS[commune_name.upper()]

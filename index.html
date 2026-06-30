@@ -1055,6 +1055,46 @@ async function submitForm(e) {
   }
 }
 
+
+function showMsg(text, color) {
+  const el = document.getElementById('form-msg');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = color;
+}
+
+function showConfirmation(adresse, prenom) {
+  document.getElementById('form-fields').style.display = 'none';
+  document.getElementById('form-success').style.display = 'block';
+  const greeting = prenom ? 'Merci ' + prenom + '\u00a0!' : 'Merci\u00a0!';
+  const msg = document.getElementById('success-msg');
+  msg.innerHTML = '';
+  const strong = document.createElement('strong');
+  strong.textContent = greeting;
+  msg.appendChild(strong);
+  msg.appendChild(document.createTextNode(' Dès demain matin à 8h, nous vous notifierons si une mise à l\'enquête est annoncée autour de '));
+  const adresseSpan = document.createElement('strong');
+  adresseSpan.textContent = adresse;
+  msg.appendChild(adresseSpan);
+  msg.appendChild(document.createTextNode('.'));
+}
+
+function showConfirmationHorsVaud(prenom) {
+  document.getElementById('form-fields').style.display = 'none';
+  document.getElementById('form-success').style.display = 'block';
+  const greeting = prenom ? 'Merci ' + prenom + '\u00a0!' : 'Merci\u00a0!';
+  const msg = document.getElementById('success-msg');
+  msg.innerHTML = '';
+  const strong = document.createElement('strong');
+  strong.textContent = greeting;
+  msg.appendChild(strong);
+  msg.appendChild(document.createTextNode(' Votre canton n\'est pas encore couvert par PhémeApp.'));
+  const sub = document.createElement('p');
+  sub.style.cssText = 'margin-top:12px;font-size:14px;color:#555;line-height:1.6';
+  sub.textContent = 'Nous avons bien enregistré votre adresse. Nous vous contacterons dès que nous lancerons la surveillance dans votre canton.';
+  msg.appendChild(sub);
+}
+
 </script>
 </body>
 </html>
